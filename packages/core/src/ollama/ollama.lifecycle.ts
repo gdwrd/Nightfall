@@ -132,7 +132,7 @@ export async function ensureOllama(
 
   onEvent({ type: 'detecting' })
 
-  let running = await isOllamaRunning(host, port)
+  const running = await isOllamaRunning(host, port)
 
   if (!running) {
     onEvent({ type: 'starting' })
