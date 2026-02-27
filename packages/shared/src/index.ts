@@ -1,3 +1,8 @@
-// @nightfall/shared — barrel export
-// Types will be added in Phase 2
-export {};
+export * from './agent.types.js'
+export * from './task.types.js'
+export * from './memory.types.js'
+export * from './lock.types.js'
+export * from './snapshot.types.js'
+export * from './config.types.js'
+export * from './provider.types.js'
+export * from './websocket.types.js'
