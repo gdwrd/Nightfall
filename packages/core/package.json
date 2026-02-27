@@ -1,0 +1,22 @@
+{
+  "name": "@nightfall/core",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "nightfall-core": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "eslint src/",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@nightfall/shared": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

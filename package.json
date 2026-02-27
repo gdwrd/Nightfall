@@ -1,0 +1,21 @@
+{
+  "name": "nightfall-monorepo",
+  "private": true,
+  "packageManager": "npm@10.9.4",
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "test": "turbo run test",
+    "lint": "turbo run lint"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.0",
+    "typescript": "^5.4.0",
+    "eslint": "^9.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "prettier": "^3.0.0",
+    "vitest": "^1.0.0"
+  }
+}
