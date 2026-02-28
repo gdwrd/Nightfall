@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Box, Text, useApp, useInput } from 'ink';
 import type { NightfallConfig, TaskRun, AgentState, FileLock, SnapshotMeta } from '@nightfall/shared';
-import type { OllamaLifecycleEvent } from '@nightfall/shared';
+import type { ProviderLifecycleEvent } from '@nightfall/shared';
 import type { IOrchestrator } from '../ws.client.js';
 import { THEME } from '../theme.js';
 import { Header } from './Header.js';
@@ -54,9 +54,9 @@ export const App: React.FC<AppProps> = ({ config, orchestrator }) => {
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // ── Ollama lifecycle events ─────────────────────────────────────────────────
+  // ── Provider lifecycle events ──────────────────────────────────────────────
   useEffect(() => {
-    const onLifecycle = (event: OllamaLifecycleEvent) => {
+    const onLifecycle = (event: ProviderLifecycleEvent) => {
       dispatch({ type: 'LIFECYCLE_EVENT', event });
     };
     orchestrator.on('lifecycle', onLifecycle);

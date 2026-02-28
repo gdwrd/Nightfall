@@ -41,14 +41,29 @@ function validateConfig(config: NightfallConfig): void {
   if (!provider.model || typeof provider.model !== 'string') {
     throw new Error('Config validation failed: provider.model must be a non-empty string');
   }
-  if (!provider.host || typeof provider.host !== 'string') {
-    throw new Error('Config validation failed: provider.host must be a non-empty string');
+
+  // Provider-specific validation
+  switch (provider.name) {
+    case 'ollama': {
+      if (!provider.host || typeof provider.host !== 'string') {
+        throw new Error('Config validation failed: provider.host must be a non-empty string');
+      }
+      if (typeof provider.port !== 'number' || provider.port <= 0 || provider.port > 65535) {
+        throw new Error(
+          'Config validation failed: provider.port must be a valid port number (1-65535)',
+        );
+      }
+      break;
+    }
+    case 'openrouter':
+      // No host/port needed. API key is validated at runtime via env var.
+      break;
+    default:
+      throw new Error(
+        `Config validation failed: unknown provider "${String((provider as unknown as { name: string }).name)}"`,
+      );
   }
-  if (typeof provider.port !== 'number' || provider.port <= 0 || provider.port > 65535) {
-    throw new Error(
-      'Config validation failed: provider.port must be a valid port number (1-65535)',
-    );
-  }
+
   if (typeof concurrency.max_engineers !== 'number' || concurrency.max_engineers < 1) {
     throw new Error('Config validation failed: concurrency.max_engineers must be >= 1');
   }

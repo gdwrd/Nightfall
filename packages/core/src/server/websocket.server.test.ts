@@ -21,6 +21,13 @@ vi.mock('../ollama/ollama.lifecycle.js', () => ({
   },
 }));
 
+vi.mock('../providers/openrouter/openrouter.lifecycle.js', () => ({
+  ensureOpenRouter: (_cfg: unknown, cb: (e: unknown) => void) => {
+    cb({ type: 'model_ready', model: 'test-model' });
+    return Promise.resolve();
+  },
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -43,7 +50,7 @@ function getFreePort(): Promise<number> {
 
 function makeConfig(overrides: Partial<NightfallConfig> = {}): NightfallConfig {
   return {
-    provider: { name: 'ollama', model: 'test-model', host: 'localhost', port: 11434 },
+    provider: { name: 'ollama' as const, model: 'test-model', host: 'localhost', port: 11434 },
     concurrency: { max_engineers: 2 },
     task: { max_rework_cycles: 1 },
     logs: { retention: 10 },

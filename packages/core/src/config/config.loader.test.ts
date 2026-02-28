@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import type { OllamaProviderConfig } from '@nightfall/shared';
 
 // Use a hardcoded temp path to avoid needing os.tmpdir() inside the mock
 const MOCK_HOME = `/tmp/nightfall-test-${process.pid}`;
@@ -56,10 +57,16 @@ concurrency:
     );
 
     const config = await loadConfig();
-    expect(config.provider.model).toBe('llama3:8b');
-    expect(config.provider.port).toBe(11435);
-    expect(config.provider.host).toBe(DEFAULT_CONFIG.provider.host);
     expect(config.provider.name).toBe(DEFAULT_CONFIG.provider.name);
+    expect(config.provider.model).toBe('llama3:8b');
+
+    // Narrow to OllamaProviderConfig for Ollama-specific fields
+    expect(config.provider.name).toBe('ollama');
+    const provider = config.provider as OllamaProviderConfig;
+    const defaultProvider = DEFAULT_CONFIG.provider as OllamaProviderConfig;
+    expect(provider.port).toBe(11435);
+    expect(provider.host).toBe(defaultProvider.host);
+
     expect(config.concurrency.max_engineers).toBe(5);
     expect(config.task.max_rework_cycles).toBe(DEFAULT_CONFIG.task.max_rework_cycles);
     expect(config.logs.retention).toBe(DEFAULT_CONFIG.logs.retention);
@@ -80,5 +87,29 @@ concurrency:
     fs.mkdirSync(NIGHTFALL_DIR, { recursive: true });
     fs.writeFileSync(CONFIG_PATH, `provider:\n  port: 99999\n`);
     await expect(loadConfig()).rejects.toThrow('provider.port');
+  });
+
+  it('accepts a valid openrouter provider config', async () => {
+    const { loadConfig } = await import('./config.loader.js');
+    fs.mkdirSync(NIGHTFALL_DIR, { recursive: true });
+    fs.writeFileSync(
+      CONFIG_PATH,
+      `
+provider:
+  name: openrouter
+  model: anthropic/claude-sonnet-4
+`,
+    );
+
+    const config = await loadConfig();
+    expect(config.provider.name).toBe('openrouter');
+    expect(config.provider.model).toBe('anthropic/claude-sonnet-4');
+  });
+
+  it('throws on unknown provider name', async () => {
+    const { loadConfig } = await import('./config.loader.js');
+    fs.mkdirSync(NIGHTFALL_DIR, { recursive: true });
+    fs.writeFileSync(CONFIG_PATH, `provider:\n  name: unknown_provider\n`);
+    await expect(loadConfig()).rejects.toThrow('unknown provider');
   });
 });

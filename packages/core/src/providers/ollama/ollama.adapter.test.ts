@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import http from 'node:http';
-import type { NightfallConfig, ChatMessage } from '@nightfall/shared';
+import type { NightfallConfig, ChatMessage, OllamaProviderConfig } from '@nightfall/shared';
 import { OllamaAdapter } from './ollama.adapter.js';
 import { createProvider } from '../provider.factory.js';
 
@@ -109,10 +109,10 @@ function startMockServer(): Promise<void> {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeConfig(overrides: Partial<NightfallConfig['provider']> = {}): NightfallConfig {
+function makeConfig(overrides: Partial<OllamaProviderConfig> = {}): NightfallConfig {
   return {
     provider: {
-      name: 'ollama',
+      name: 'ollama' as const,
       model: 'test-model',
       host: '127.0.0.1',
       port: serverPort,
@@ -210,8 +210,12 @@ describe('createProvider', () => {
   });
 
   it('throws on unknown provider name', () => {
-    expect(() => createProvider(makeConfig({ name: 'openai' }))).toThrow(
-      'Unknown provider: openai',
-    );
+    const config = {
+      provider: { name: 'openai', model: 'test-model' },
+      concurrency: { max_engineers: 3 },
+      task: { max_rework_cycles: 3 },
+      logs: { retention: 50 },
+    } as unknown as NightfallConfig;
+    expect(() => createProvider(config)).toThrow('Unknown provider: openai');
   });
 });

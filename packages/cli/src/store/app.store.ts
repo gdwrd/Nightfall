@@ -1,5 +1,5 @@
 import { useReducer } from 'react';
-import type { TaskRun, AgentState, FileLock, OllamaLifecycleEvent, SnapshotMeta } from '@nightfall/shared';
+import type { TaskRun, AgentState, FileLock, ProviderLifecycleEvent, SnapshotMeta } from '@nightfall/shared';
 import type { AppAction } from './app.actions.js';
 
 // ---------------------------------------------------------------------------
@@ -7,7 +7,7 @@ import type { AppAction } from './app.actions.js';
 // ---------------------------------------------------------------------------
 
 export type AppPhase =
-  | 'lifecycle' // Ollama startup in progress
+  | 'lifecycle' // Provider startup in progress
   | 'idle' // Ready for user input
   | 'planning' // Team Lead drafting the plan
   | 'awaiting_approval' // Plan ready, waiting for y/n/e
@@ -20,7 +20,7 @@ export type AppPhase =
 
 export interface AppState {
   phase: AppPhase;
-  lifecycleEvent: OllamaLifecycleEvent;
+  lifecycleEvent: ProviderLifecycleEvent;
   activeRun: TaskRun | null;
   agentStates: Record<string, AgentState>;
   locks: FileLock[];
