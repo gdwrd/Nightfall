@@ -1,5 +1,5 @@
 import { useReducer } from 'react';
-import type { TaskRun, AgentState, FileLock, OllamaLifecycleEvent } from '@nightfall/shared';
+import type { TaskRun, AgentState, FileLock, OllamaLifecycleEvent, SnapshotMeta } from '@nightfall/shared';
 import type { AppAction } from './app.actions.js';
 
 // ---------------------------------------------------------------------------
@@ -14,7 +14,9 @@ export type AppPhase =
   | 'editing_plan' // External editor open for plan editing
   | 'running' // Engineers / reviewer executing
   | 'completed' // Task finished
-  | 'error'; // Fatal error
+  | 'error' // Fatal error
+  | 'history_view' // Browsing task history
+  | 'rollback_confirm'; // Awaiting rollback cascade confirmation
 
 export interface AppState {
   phase: AppPhase;
@@ -25,6 +27,10 @@ export interface AppState {
   messages: string[];
   errorMessage: string | null;
   slashOutput: string | null;
+  historyRuns: TaskRun[];
+  historySnapshots: SnapshotMeta[];
+  rollbackChain: SnapshotMeta[];
+  pendingRollbackSnapshotId: string | null;
 }
 
 const initialState: AppState = {
@@ -36,6 +42,10 @@ const initialState: AppState = {
   messages: [],
   errorMessage: null,
   slashOutput: null,
+  historyRuns: [],
+  historySnapshots: [],
+  rollbackChain: [],
+  pendingRollbackSnapshotId: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -123,6 +133,22 @@ function reducer(state: AppState, action: AppAction): AppState {
       return {
         ...state,
         activeRun: state.activeRun ? { ...state.activeRun, plan: action.plan } : null,
+      };
+
+    case 'SET_HISTORY_DATA':
+      return {
+        ...state,
+        phase: 'history_view',
+        historyRuns: action.runs,
+        historySnapshots: action.snapshots,
+      };
+
+    case 'SET_ROLLBACK_CHAIN':
+      return {
+        ...state,
+        phase: 'rollback_confirm',
+        rollbackChain: action.chain,
+        pendingRollbackSnapshotId: action.snapshotId,
       };
 
     default:
