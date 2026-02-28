@@ -9,6 +9,8 @@ import { agentsHandler } from './handlers/agents.handler.js';
 import { memoryHandler } from './handlers/memory.handler.js';
 import { compactHandler } from './handlers/compact.handler.js';
 import { clearHandler } from './handlers/clear.handler.js';
+import { modelHandler } from './handlers/model.handler.js';
+import { settingsHandler } from './handlers/settings.handler.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -59,6 +61,12 @@ export class CommandDispatcher {
 
       case '/clear':
         return clearHandler();
+
+      case '/model':
+        return modelHandler(this.ctx, args);
+
+      case '/settings':
+        return settingsHandler(this.ctx, args);
 
       default:
         return `Unknown command: ${command}. Type /help for available commands.`;

@@ -74,6 +74,25 @@ export async function isModelAvailable(
   }
 }
 
+export interface OllamaModel {
+  name: string;
+  size: number;
+  modified_at: string;
+}
+
+/**
+ * Fetch the list of locally installed Ollama models.
+ */
+export async function listOllamaModels(host: string, port: number): Promise<OllamaModel[]> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5_000);
+  const response = await fetch(`http://${host}:${port}/api/tags`, { signal: controller.signal });
+  clearTimeout(timeout);
+  if (!response.ok) throw new Error(`Ollama /api/tags returned HTTP ${response.status}`);
+  const data = (await response.json()) as { models?: OllamaModel[] };
+  return data.models ?? [];
+}
+
 /**
  * Stream `ollama pull <model>` and emit progress events (0–100).
  */
