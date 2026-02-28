@@ -124,9 +124,15 @@ export class BaseAgent extends EventEmitter {
     };
   }
 
-  /** Snapshot of the current agent state (immutable copy). */
+  /** Snapshot of the current agent state with log trimmed to last 50 entries (for broadcast). */
   get state(): AgentState {
-    return { ...this._state, log: [...this._state.log] };
+    const MAX_BROADCAST_LOG = 50;
+    return { ...this._state, log: this._state.log.slice(-MAX_BROADCAST_LOG) };
+  }
+
+  /** Full untruncated log — used for internal processing (e.g. AgentRunResult, extractFilesTouched). */
+  private get fullLog(): AgentLogEntry[] {
+    return this._state.log;
   }
 
   /**
@@ -158,12 +164,19 @@ export class BaseAgent extends EventEmitter {
       // --- Abort check ---
       if (signal?.aborted) {
         this.setStatus('done', null, 'Cancelled');
-        return { summary: 'Cancelled', log: this.state.log };
+        return { summary: 'Cancelled', log: this.fullLog };
       }
 
       // --- Context window management ---
       if (maxContextTokens) {
         compactMessages(messages, maxContextTokens);
+        if (estimateTokens(messages) > maxContextTokens) {
+          process.stderr.write(
+            `[nightfall] agent ${this.config.id}: context overflow — ` +
+            `~${estimateTokens(messages)} tokens exceeds budget ${maxContextTokens}; ` +
+            `no messages left to compact (${messages.length} total).\n`,
+          );
+        }
       }
 
       // --- LLM call ---
@@ -190,7 +203,7 @@ export class BaseAgent extends EventEmitter {
 
       if (signal?.aborted) {
         this.setStatus('done', null, 'Cancelled');
-        return { summary: 'Cancelled', log: this.state.log };
+        return { summary: 'Cancelled', log: this.fullLog };
       }
 
       // Final emit with the complete response text
@@ -242,7 +255,7 @@ export class BaseAgent extends EventEmitter {
         this.setStatus('done', null, done.summary);
         return {
           summary: done.summary,
-          log: this.state.log,
+          log: this.fullLog,
           tokenUsage: this.buildTokenUsage(totalPromptTokens, totalCompletionTokens),
         };
       }
@@ -251,7 +264,7 @@ export class BaseAgent extends EventEmitter {
       this.setStatus('done', null, response.trim());
       return {
         summary: response.trim(),
-        log: this.state.log,
+        log: this.fullLog,
         tokenUsage: this.buildTokenUsage(totalPromptTokens, totalCompletionTokens),
       };
     }
@@ -262,7 +275,7 @@ export class BaseAgent extends EventEmitter {
     this.setStatus('done', null, iterationMsg);
     return {
       summary: iterationMsg,
-      log: this.state.log,
+      log: this.fullLog,
       interrupted: true,
       tokenUsage: this.buildTokenUsage(totalPromptTokens, totalCompletionTokens),
     };

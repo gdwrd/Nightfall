@@ -212,14 +212,19 @@ describe('NightfallServer', () => {
     expect(msgs.some((m) => m.type === 'TASK_STATE')).toBe(true);
   });
 
-  it('broadcasts PLAN_READY after SUBMIT_TASK completes planning', async () => {
+  it('broadcasts TASK_STATE with awaiting_approval and plan after SUBMIT_TASK', async () => {
     const provider = makeProvider([planDone([{ id: 's1', description: 'Write the feature' }])]);
     server = new NightfallServer({ config: makeConfig(), provider, projectRoot: '/tmp', port });
     server.start();
 
     const { msgs, ws } = await collectUntil(
       port,
-      (m) => m.some((msg) => msg.type === 'PLAN_READY'),
+      (m) =>
+        m.some(
+          (msg) =>
+            msg.type === 'TASK_STATE' &&
+            (msg.payload as { status: string }).status === 'awaiting_approval',
+        ),
       (ws) => {
         ws.send(JSON.stringify({ type: 'SUBMIT_TASK', payload: { prompt: 'Add a button' } }));
       },
@@ -227,6 +232,12 @@ describe('NightfallServer', () => {
     );
     openClients.push(ws);
 
-    expect(msgs.some((m) => m.type === 'PLAN_READY')).toBe(true);
+    const approvalMsg = msgs.find(
+      (m) =>
+        m.type === 'TASK_STATE' &&
+        (m.payload as { status: string }).status === 'awaiting_approval',
+    );
+    expect(approvalMsg).toBeDefined();
+    expect((approvalMsg!.payload as { plan: unknown }).plan).toBeDefined();
   });
 });

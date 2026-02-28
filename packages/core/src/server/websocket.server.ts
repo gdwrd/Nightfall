@@ -56,8 +56,8 @@ export class NightfallServer extends EventEmitter {
   /** Handle to the pending plan-approval task ID (managed by WsBroadcaster). */
   private approval: PendingApprovalHandle | null = null;
 
-  /** AbortController for the currently running or planning task. */
-  private activeAbortController: AbortController | null = null;
+  /** AbortControllers for all currently running or planning tasks. */
+  private activeAbortControllers: AbortController[] = [];
 
   /** The port this server listens on. */
   readonly port: number;
@@ -151,10 +151,13 @@ export class NightfallServer extends EventEmitter {
     switch (msg.type) {
       case 'SUBMIT_TASK': {
         const ac = new AbortController();
-        this.activeAbortController = ac;
+        this.activeAbortControllers.push(ac);
         this.orchestrator.submitTask(msg.payload.prompt, ac.signal).catch((err: unknown) => {
           const message = err instanceof Error ? err.message : String(err);
           this.broadcaster.send(ws, { type: 'ERROR', payload: { message } });
+        }).finally(() => {
+          const idx = this.activeAbortControllers.indexOf(ac);
+          if (idx !== -1) this.activeAbortControllers.splice(idx, 1);
         });
         break;
       }
@@ -170,12 +173,16 @@ export class NightfallServer extends EventEmitter {
         }
         this.approval?.clearPendingTaskId();
         const ac = new AbortController();
-        this.activeAbortController = ac;
+        this.activeAbortControllers.push(ac);
         this.orchestrator
           .approvePlan(taskId, ac.signal, msg.payload.editedPlan)
           .catch((err: unknown) => {
             const message = err instanceof Error ? err.message : String(err);
             this.broadcaster.send(ws, { type: 'ERROR', payload: { message } });
+          })
+          .finally(() => {
+            const idx = this.activeAbortControllers.indexOf(ac);
+            if (idx !== -1) this.activeAbortControllers.splice(idx, 1);
           });
         break;
       }
@@ -186,8 +193,10 @@ export class NightfallServer extends EventEmitter {
       }
 
       case 'INTERRUPT': {
-        this.activeAbortController?.abort();
-        this.activeAbortController = null;
+        for (const ac of this.activeAbortControllers) {
+          ac.abort();
+        }
+        this.activeAbortControllers = [];
         break;
       }
 

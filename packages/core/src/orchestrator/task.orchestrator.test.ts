@@ -59,6 +59,9 @@ function planDone(subtasks: Array<{ id: string; description: string }>): string 
   return `<done>{"summary":${JSON.stringify(JSON.stringify(plan))}}</done>`;
 }
 
+/** Classifier response that routes to coding_task. */
+const CLASSIFY_CODING_TASK = '<done>{"type":"coding_task"}</done>';
+
 /** Review JSON that passes. */
 const REVIEW_PASS = `<done>{"summary":"{\\"passed\\":true,\\"issues\\":[],\\"notes\\":\\"LGTM\\"}"}
 </done>`;
@@ -347,11 +350,13 @@ describe('TaskOrchestrator.approvePlan — success path', () => {
 
   it('completes the task when reviewer passes', async () => {
     // Responses in order:
-    //   1. Team Lead plan
-    //   2. Engineer done
-    //   3. Reviewer pass
-    //   4. Memory Manager done
+    //   1. Classifier → coding_task
+    //   2. Team Lead plan
+    //   3. Engineer done
+    //   4. Reviewer pass
+    //   5. Memory Manager done
     const provider = makeProvider([
+      CLASSIFY_CODING_TASK,
       planDone([{ id: 's1', description: 'Write the feature' }]),
       '<done>{"summary":"Feature implemented"}</done>',
       REVIEW_PASS,
@@ -374,6 +379,7 @@ describe('TaskOrchestrator.approvePlan — success path', () => {
 
   it('saves a log file on completion', async () => {
     const provider = makeProvider([
+      CLASSIFY_CODING_TASK,
       planDone([{ id: 's1', description: 'task' }]),
       '<done>{"summary":"done"}</done>',
       REVIEW_PASS,
@@ -396,6 +402,7 @@ describe('TaskOrchestrator.approvePlan — success path', () => {
 
   it('emits task:status with completed', async () => {
     const provider = makeProvider([
+      CLASSIFY_CODING_TASK,
       planDone([{ id: 's1', description: 'task' }]),
       '<done>{"summary":"done"}</done>',
       REVIEW_PASS,
@@ -421,6 +428,7 @@ describe('TaskOrchestrator.approvePlan — success path', () => {
 
   it('runs multiple engineers for multi-subtask plan', async () => {
     const provider = makeProvider([
+      CLASSIFY_CODING_TASK,
       planDone([
         { id: 's1', description: 'Engineer task 1' },
         { id: 's2', description: 'Engineer task 2' },
@@ -468,6 +476,8 @@ describe('TaskOrchestrator — rework cycle', () => {
 
   it('triggers rework when reviewer fails, then completes on second pass', async () => {
     const provider = makeProvider([
+      // Classifier
+      CLASSIFY_CODING_TASK,
       // Team Lead plan
       planDone([{ id: 's1', description: 'Do the thing' }]),
       // Engineer (first attempt)
@@ -501,6 +511,7 @@ describe('TaskOrchestrator — rework cycle', () => {
 
   it('reaches rework_limit_reached when reviewer always fails', async () => {
     const provider = makeProvider([
+      CLASSIFY_CODING_TASK,
       planDone([{ id: 's1', description: 'task' }]),
       // Engineer cycle 1
       '<done>{"summary":"attempt 1"}</done>',

@@ -242,6 +242,15 @@ export class TaskOrchestrator extends EventEmitter {
     run.status = 'running';
     this.emit('task:status', this.snapshot(run));
 
+    // Build factory options once and reuse across all agent stages (#12)
+    const factoryOptions = await this.buildFactoryOptions();
+
+    // Snapshot original descriptions so rework cycles always reference the
+    // plan-as-approved, not a previously mutated rework description (#5)
+    const originalDescriptions = new Map<string, string>(
+      run.plan.subtasks.map((s) => [s.id, s.description]),
+    );
+
     const maxReworkCycles = this.options.config.task.max_rework_cycles;
 
     // Rework loop — repeats if the reviewer flags issues
@@ -249,19 +258,19 @@ export class TaskOrchestrator extends EventEmitter {
       if (signal?.aborted) return this.cancelRun(run);
 
       // ── Engineers ──────────────────────────────────────────────────────────
-      const engineerResults = await this.runEngineers(run, signal);
+      const engineerResults = await this.runEngineers(run, signal, factoryOptions);
       if (signal?.aborted) return this.cancelRun(run);
 
       // ── Reviewer ───────────────────────────────────────────────────────────
       run.status = 'reviewing';
       this.emit('task:status', this.snapshot(run));
 
-      const reviewResult = await this.runReviewer(run, engineerResults, signal);
+      const reviewResult = await this.runReviewer(run, engineerResults, signal, factoryOptions);
       if (signal?.aborted) return this.cancelRun(run);
 
       if (reviewResult.passed) {
         // ── Memory Manager ──────────────────────────────────────────────────
-        const memUsage = await this.runMemoryManager(run, engineerResults, signal);
+        const memUsage = await this.runMemoryManager(run, engineerResults, signal, factoryOptions);
 
         // Aggregate token usage from all agents in this task
         run.tokenUsage = aggregateTokenUsage([
@@ -294,7 +303,7 @@ export class TaskOrchestrator extends EventEmitter {
           '(no summary from previous attempt)';
         subtask.description =
           `[REWORK — cycle ${run.reworkCycles}]\n\n` +
-          `Original task:\n${subtask.description}\n\n` +
+          `Original task:\n${originalDescriptions.get(subtask.id) ?? subtask.description}\n\n` +
           `Your previous attempt result:\n${previousAttempt}\n\n` +
           `Reviewer found these issues — fix ALL of them:\n${issueLines}`;
         subtask.status = 'pending';
@@ -313,12 +322,15 @@ export class TaskOrchestrator extends EventEmitter {
   // Engineer stage
   // ---------------------------------------------------------------------------
 
-  private async runEngineers(run: TaskRun, signal?: AbortSignal): Promise<EngineerResult[]> {
+  private async runEngineers(
+    run: TaskRun,
+    signal: AbortSignal | undefined,
+    factoryOptions: AgentFactoryOptions,
+  ): Promise<EngineerResult[]> {
     if (!run.plan) return [];
 
     const maxEngineers = this.options.config.concurrency.max_engineers;
     const results: EngineerResult[] = [];
-    const factoryOptions = await this.buildFactoryOptions();
     let engineerCounter = 0;
 
     // Process subtasks in dependency-aware waves. Each iteration finds all
@@ -367,7 +379,7 @@ export class TaskOrchestrator extends EventEmitter {
             subtask.status = signal?.aborted || blocked ? 'failed' : 'done';
             run.agentStates[engineerId] = engineer.state;
 
-            const filesTouched = extractFilesTouched(engineer.state.log);
+            const filesTouched = extractFilesTouched(result.log);
             subtask.filesTouched = filesTouched;
 
             return {
@@ -385,6 +397,24 @@ export class TaskOrchestrator extends EventEmitter {
       }
     }
 
+    // Mark any still-pending subtasks as failed — they were blocked by a failed
+    // dependency and the wave loop exited without ever making them ready (#8)
+    for (const subtask of run.plan.subtasks) {
+      if (subtask.status !== 'pending') continue;
+      const failedDep = (subtask.dependsOn ?? []).find(
+        (depId) => run.plan!.subtasks.find((d) => d.id === depId)?.status === 'failed',
+      );
+      subtask.status = 'failed';
+      results.push({
+        subtaskId: subtask.id,
+        summary: failedDep
+          ? `Skipped: dependency '${failedDep}' failed`
+          : 'Skipped: dependency not satisfied',
+        filesChanged: [],
+        interrupted: true,
+      });
+    }
+
     return results;
   }
 
@@ -395,9 +425,9 @@ export class TaskOrchestrator extends EventEmitter {
   private async runReviewer(
     run: TaskRun,
     engineerResults: EngineerResult[],
-    signal?: AbortSignal,
+    signal: AbortSignal | undefined,
+    factoryOptions: AgentFactoryOptions,
   ): Promise<ReviewResult> {
-    const factoryOptions = await this.buildFactoryOptions();
     const toolRegistry = new ToolRegistry();
     const reviewer = createReviewerAgent(factoryOptions, toolRegistry);
     this.wireAgentEvents(reviewer, run);
@@ -445,11 +475,11 @@ export class TaskOrchestrator extends EventEmitter {
   private async runMemoryManager(
     run: TaskRun,
     engineerResults: EngineerResult[],
-    signal?: AbortSignal,
+    signal: AbortSignal | undefined,
+    factoryOptions: AgentFactoryOptions,
   ): Promise<TokenUsage | undefined> {
     if (!run.plan) return undefined;
 
-    const factoryOptions = await this.buildFactoryOptions();
     const toolRegistry = new ToolRegistry();
     const memoryManager = createMemoryManagerAgent(factoryOptions, toolRegistry);
     this.wireAgentEvents(memoryManager, run);
@@ -602,8 +632,11 @@ export class TaskOrchestrator extends EventEmitter {
           this.options.config.concurrency.max_engineers,
         ),
       };
-    } catch {
-      // If parsing fails, treat the whole task as a single engineer subtask
+    } catch (err) {
+      process.stderr.write(
+        `[nightfall] parsePlan: Team Lead response is not valid JSON — ` +
+        `falling back to single subtask. Error: ${err instanceof Error ? err.message : String(err)}\n`,
+      );
       return {
         taskId,
         prompt,
@@ -710,7 +743,11 @@ function parseReviewResult(summary: string): ReviewResult {
       notes: String(parsed['notes'] ?? ''),
     };
   } catch {
-    return { passed: true, issues: [], notes: summary };
+    return {
+      passed: false,
+      issues: ['Reviewer response could not be parsed as JSON'],
+      notes: summary,
+    };
   }
 }
 

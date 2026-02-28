@@ -63,10 +63,6 @@ export class WsBroadcaster {
 
       this.broadcast({ type: 'TASK_STATE', payload: run });
 
-      if (run.status === 'awaiting_approval' && run.plan) {
-        this.broadcast({ type: 'PLAN_READY', payload: run.plan });
-      }
-
       if (
         run.status === 'completed' ||
         run.status === 'rework_limit_reached' ||
