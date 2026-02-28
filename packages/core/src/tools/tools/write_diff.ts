@@ -1,8 +1,8 @@
 import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
 import { applyPatch } from 'diff';
 import type { LockRegistry } from '../../locks/lock.registry.js';
 import type { ToolImpl, ToolResult, ToolContext } from '../tool.types.js';
+import { resolveAndValidatePath } from './path.utils.js';
 
 let _lockRegistry: LockRegistry | null = null;
 
@@ -51,7 +51,17 @@ export const writeDiffTool: ToolImpl = {
       };
     }
 
-    const resolved = path.isAbsolute(filePath) ? filePath : path.join(ctx.projectRoot, filePath);
+    let resolved: string;
+    try {
+      resolved = resolveAndValidatePath(filePath, ctx.projectRoot);
+    } catch (err) {
+      return {
+        tool: 'write_diff',
+        success: false,
+        output: '',
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
 
     const registry = _lockRegistry;
 

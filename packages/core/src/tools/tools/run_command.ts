@@ -142,7 +142,8 @@ export const runCommandTool: ToolImpl = {
 
 function truncateOutput(output: string): string {
   if (output.length <= MAX_OUTPUT_CHARS) return output;
-  const kept = output.slice(0, MAX_OUTPUT_CHARS);
-  const dropped = output.length - MAX_OUTPUT_CHARS;
-  return `${kept}\n[... ${dropped} bytes truncated]`;
+  const HEAD = 2_000;
+  const TAIL = MAX_OUTPUT_CHARS - HEAD;
+  const omitted = output.length - HEAD - TAIL;
+  return `${output.slice(0, HEAD)}\n[... ${omitted} bytes omitted ...]\n${output.slice(-TAIL)}`;
 }
