@@ -20,15 +20,48 @@ interface InitResult {
   filesCreated: string[];
 }
 
+export interface InitPreview {
+  files: Array<{ path: string; description: string }>;
+}
+
 interface ProjectInfo {
   name: string;
   description: string;
+  readmeIntro: string;
   dependencies: Record<string, string>;
   devDependencies: Record<string, string>;
   scripts: Record<string, string>;
   hasTypeScript: boolean;
+  hasEnvExample: boolean;
+  hasDocker: boolean;
   entryPoints: string[];
   srcDirs: string[];
+}
+
+/**
+ * Scan the project and return a preview of files that would be created,
+ * without writing anything to disk.
+ */
+export async function previewMemoryBank(projectRoot: string): Promise<InitPreview> {
+  const projectInfo = await scanProject(projectRoot);
+  const srcModules = await discoverModules(projectRoot, projectInfo.srcDirs);
+
+  const files: Array<{ path: string; description: string }> = [
+    { path: 'index.md', description: 'memory index (routing map for agents)' },
+    { path: 'project.md', description: 'project goals, scope, requirements' },
+    { path: 'tech.md', description: 'stack, dependencies, environment setup' },
+    { path: 'patterns.md', description: 'architecture, key decisions, design patterns' },
+    { path: 'progress.md', description: 'current status, known issues' },
+  ];
+
+  for (const mod of srcModules) {
+    files.push({
+      path: `components/${mod.name}.md`,
+      description: mod.description,
+    });
+  }
+
+  return { files };
 }
 
 /**
@@ -89,10 +122,13 @@ async function scanProject(projectRoot: string): Promise<ProjectInfo> {
   const info: ProjectInfo = {
     name: '',
     description: '',
+    readmeIntro: '',
     dependencies: {},
     devDependencies: {},
     scripts: {},
     hasTypeScript: false,
+    hasEnvExample: false,
+    hasDocker: false,
     entryPoints: [],
     srcDirs: [],
   };
@@ -117,6 +153,43 @@ async function scanProject(projectRoot: string): Promise<ProjectInfo> {
     info.hasTypeScript = true;
   } catch {
     // not a TS project
+  }
+
+  // Extract first paragraph from README.md
+  try {
+    const readmeRaw = await fs.readFile(path.join(projectRoot, 'README.md'), 'utf8');
+    const paragraphs = (readmeRaw.split(/\n{2,}/) as string[])
+      .map((p: string) => p.replace(/^#+\s+.*$/m, '').trim())
+      .filter((p: string) => p.length > 0 && !p.startsWith('#'));
+    if (paragraphs.length > 0) {
+      info.readmeIntro = paragraphs[0].replace(/\n/g, ' ').trim();
+    }
+  } catch {
+    // no README
+  }
+
+  // Check for .env.example
+  try {
+    await fs.access(path.join(projectRoot, '.env.example'));
+    info.hasEnvExample = true;
+  } catch {
+    // no .env.example
+  }
+
+  // Check for Docker files
+  try {
+    await fs.access(path.join(projectRoot, 'Dockerfile'));
+    info.hasDocker = true;
+  } catch {
+    // no Dockerfile
+  }
+  if (!info.hasDocker) {
+    try {
+      await fs.access(path.join(projectRoot, 'docker-compose.yml'));
+      info.hasDocker = true;
+    } catch {
+      // no docker-compose.yml
+    }
   }
 
   // Discover top-level source directories
@@ -252,8 +325,9 @@ function buildIndex(modules: ModuleInfo[]): MemoryIndex {
 function buildProjectFile(info: ProjectInfo): string {
   const lines = ['# Project', '', `**Name:** ${info.name}`];
 
-  if (info.description) {
-    lines.push(`**Description:** ${info.description}`);
+  const desc = info.readmeIntro || info.description;
+  if (desc) {
+    lines.push(`**Description:** ${desc}`);
   }
 
   if (info.entryPoints.length > 0) {
@@ -276,8 +350,15 @@ function buildTechFile(info: ProjectInfo): string {
     lines.push('- **Language:** TypeScript');
   }
 
-  const allDeps = { ...info.dependencies, ...info.devDependencies };
-  const depNames = Object.keys(allDeps);
+  if (info.hasEnvExample) {
+    lines.push('- **Environment variables:** see `.env.example`');
+  }
+
+  if (info.hasDocker) {
+    lines.push('- **Containerization:** Docker');
+  }
+
+  const depNames = Object.keys(info.dependencies);
 
   if (depNames.length > 0) {
     lines.push('');
