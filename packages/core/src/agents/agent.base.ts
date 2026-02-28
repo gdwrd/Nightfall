@@ -30,6 +30,12 @@ export interface AgentRunResult {
   summary: string;
   /** Full action log for this run. */
   log: AgentLogEntry[];
+  /**
+   * True when the agent exhausted its maxIterations budget without emitting a
+   * done signal. The orchestrator should treat this as a failed/blocked result
+   * rather than a successful completion.
+   */
+  interrupted?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -170,11 +176,13 @@ export class BaseAgent extends EventEmitter {
       return { summary: response.trim(), log: this.state.log };
     }
 
-    // Exhausted max iterations
+    // Exhausted max iterations — signal interrupted so the orchestrator can
+    // treat this as a blocked result rather than a successful completion.
     this.setStatus('done', null);
     return {
       summary: `Agent reached maximum iteration limit (${maxIterations})`,
       log: this.state.log,
+      interrupted: true,
     };
   }
 

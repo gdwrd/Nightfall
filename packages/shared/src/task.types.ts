@@ -16,6 +16,8 @@ export interface Subtask {
   assignedTo: string | null; // agent ID
   status: 'pending' | 'in_progress' | 'done' | 'failed';
   filesTouched: string[];
+  /** IDs of subtasks that must reach 'done' before this one can start. */
+  dependsOn?: string[];
 }
 
 export interface TaskPlan {

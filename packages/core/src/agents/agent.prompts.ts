@@ -30,21 +30,23 @@ When you need to call a tool, output ONLY a tool call block (no surrounding pros
 Wait for the result before proceeding. The result will arrive in the next message.
 
 ## How to Signal Completion
-When your task is fully complete, output a done block:
+When your task is fully complete, output a done block containing your role-specific JSON result
+(the exact schema is defined in your role instructions above):
 <done>
-{"summary": "Brief description of what was accomplished"}
+{ ...your structured result as defined in your role instructions... }
 </done>
 
 Rules:
 - Output exactly ONE tool call OR one done block per turn — never mix them with prose
 - Always wait for a tool result before calling another tool
-- Signal done only when you have everything you need`;
+- Signal done only when you have everything you need
+- The done block must contain valid JSON matching your role's schema`;
 
 const NO_TOOL_INSTRUCTIONS = `\
 ## How to Signal Completion
-When your task is fully complete, output a done block:
+When your task is fully complete, output a done block containing your role-specific JSON result:
 <done>
-{"summary": "Brief description of what was accomplished"}
+{ ...your structured result as defined in your role instructions... }
 </done>`;
 
 /**
