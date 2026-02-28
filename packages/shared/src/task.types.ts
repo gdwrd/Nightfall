@@ -43,4 +43,6 @@ export interface TaskRun {
   snapshotId: string | null;
   requestType: 'coding_task' | 'question' | null;
   answer: string | null;
+  /** Aggregated token usage across all agents for this task run. */
+  tokenUsage?: { promptTokens: number; completionTokens: number; totalTokens: number };
 }

@@ -70,6 +70,12 @@ function validateConfig(config: NightfallConfig): void {
   if (typeof task.max_rework_cycles !== 'number' || task.max_rework_cycles < 0) {
     throw new Error('Config validation failed: task.max_rework_cycles must be >= 0');
   }
+  if (typeof task.max_retries !== 'number' || task.max_retries < 0) {
+    throw new Error('Config validation failed: task.max_retries must be >= 0');
+  }
+  if (typeof task.max_context_tokens !== 'number' || task.max_context_tokens < 1000) {
+    throw new Error('Config validation failed: task.max_context_tokens must be >= 1000');
+  }
   if (typeof logs.retention !== 'number' || logs.retention < 1) {
     throw new Error('Config validation failed: logs.retention must be >= 1');
   }

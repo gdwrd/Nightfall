@@ -212,6 +212,11 @@ export interface AgentFactoryOptions {
   customPrompts?: Partial<
     Record<'team-lead' | 'engineer' | 'reviewer' | 'memory-manager' | 'classifier' | 'responder', string>
   >;
+  /**
+   * Approximate token budget for agent conversation history.
+   * When exceeded the oldest tool-call/result pairs are compacted.
+   */
+  maxContextTokens?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -228,6 +233,7 @@ export function createTeamLeadAgent(
     projectRoot: options.projectRoot,
     systemPrompt: options.customPrompts?.['team-lead'] ?? TEAM_LEAD_PROMPT,
     maxIterations: 20,
+    maxContextTokens: options.maxContextTokens,
   };
   return new BaseAgent(config, options.provider, toolRegistry);
 }
@@ -243,6 +249,7 @@ export function createEngineerAgent(
     projectRoot: options.projectRoot,
     systemPrompt: options.customPrompts?.['engineer'] ?? ENGINEER_PROMPT,
     maxIterations: 30,
+    maxContextTokens: options.maxContextTokens,
   };
   return new BaseAgent(config, options.provider, toolRegistry);
 }
@@ -257,6 +264,7 @@ export function createReviewerAgent(
     projectRoot: options.projectRoot,
     systemPrompt: options.customPrompts?.['reviewer'] ?? REVIEWER_PROMPT,
     maxIterations: 20,
+    maxContextTokens: options.maxContextTokens,
   };
   return new BaseAgent(config, options.provider, toolRegistry);
 }
@@ -271,6 +279,7 @@ export function createMemoryManagerAgent(
     projectRoot: options.projectRoot,
     systemPrompt: options.customPrompts?.['memory-manager'] ?? MEMORY_MANAGER_PROMPT,
     maxIterations: 20,
+    maxContextTokens: options.maxContextTokens,
   };
   return new BaseAgent(config, options.provider, toolRegistry);
 }
@@ -285,6 +294,7 @@ export function createClassifierAgent(
     projectRoot: options.projectRoot,
     systemPrompt: options.customPrompts?.['classifier'] ?? CLASSIFIER_PROMPT,
     maxIterations: 1,
+    maxContextTokens: options.maxContextTokens,
   };
   return new BaseAgent(config, options.provider, toolRegistry);
 }
@@ -299,6 +309,7 @@ export function createResponderAgent(
     projectRoot: options.projectRoot,
     systemPrompt: options.customPrompts?.['responder'] ?? RESPONDER_PROMPT,
     maxIterations: 10,
+    maxContextTokens: options.maxContextTokens,
   };
   return new BaseAgent(config, options.provider, toolRegistry);
 }

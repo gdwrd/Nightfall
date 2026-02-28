@@ -19,6 +19,8 @@ export interface NightfallConfig {
   };
   task: {
     max_rework_cycles: number;
+    max_retries: number;
+    max_context_tokens: number;
   };
   logs: {
     retention: number;

@@ -1,6 +1,6 @@
 import * as fs from 'node:fs/promises';
-import * as path from 'node:path';
 import type { ToolImpl, ToolResult, ToolContext } from '../tool.types.js';
+import { resolveAndValidatePath } from './path.utils.js';
 
 /**
  * Locate a named symbol (function, class, interface, type, const) in source text.
@@ -106,7 +106,17 @@ export const readFileTool: ToolImpl = {
       };
     }
 
-    const resolved = path.isAbsolute(filePath) ? filePath : path.join(ctx.projectRoot, filePath);
+    let resolved: string;
+    try {
+      resolved = resolveAndValidatePath(filePath, ctx.projectRoot);
+    } catch (err) {
+      return {
+        tool: 'read_file',
+        success: false,
+        output: '',
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
 
     let content: string;
     try {
@@ -116,7 +126,7 @@ export const readFileTool: ToolImpl = {
         tool: 'read_file',
         success: false,
         output: '',
-        error: `Cannot read file "${resolved}": ${err instanceof Error ? err.message : String(err)}`,
+        error: `Cannot read file "${filePath}": ${err instanceof Error ? err.message : String(err)}`,
       };
     }
 

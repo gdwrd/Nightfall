@@ -11,6 +11,7 @@ import type {
   TaskPlan,
   Subtask,
   FileLock,
+  TokenUsage,
 } from '@nightfall/shared';
 import { ToolRegistry } from '../tools/tool.registry.js';
 import { LockRegistry } from '../locks/lock.registry.js';
@@ -43,6 +44,7 @@ export interface ReviewResult {
   passed: boolean;
   issues: string[];
   notes: string;
+  tokenUsage?: TokenUsage;
 }
 
 // ---------------------------------------------------------------------------
@@ -259,7 +261,14 @@ export class TaskOrchestrator extends EventEmitter {
 
       if (reviewResult.passed) {
         // ── Memory Manager ──────────────────────────────────────────────────
-        await this.runMemoryManager(run, engineerResults, signal);
+        const memUsage = await this.runMemoryManager(run, engineerResults, signal);
+
+        // Aggregate token usage from all agents in this task
+        run.tokenUsage = aggregateTokenUsage([
+          ...engineerResults.map((r) => r.tokenUsage),
+          reviewResult.tokenUsage,
+          memUsage,
+        ]);
 
         run.status = 'completed';
         run.completedAt = Date.now();
@@ -366,6 +375,7 @@ export class TaskOrchestrator extends EventEmitter {
               summary: result.summary,
               filesChanged: filesTouched,
               interrupted: result.interrupted || blocked,
+              tokenUsage: result.tokenUsage,
             };
           }),
         );
@@ -423,7 +433,9 @@ export class TaskOrchestrator extends EventEmitter {
     run.agentStates['reviewer'] = reviewer.state;
     this.activeRuns.set(run.id, run);
 
-    return parseReviewResult(result.summary);
+    const reviewResult = parseReviewResult(result.summary);
+    reviewResult.tokenUsage = result.tokenUsage;
+    return reviewResult;
   }
 
   // ---------------------------------------------------------------------------
@@ -434,8 +446,8 @@ export class TaskOrchestrator extends EventEmitter {
     run: TaskRun,
     engineerResults: EngineerResult[],
     signal?: AbortSignal,
-  ): Promise<void> {
-    if (!run.plan) return;
+  ): Promise<TokenUsage | undefined> {
+    if (!run.plan) return undefined;
 
     const factoryOptions = await this.buildFactoryOptions();
     const toolRegistry = new ToolRegistry();
@@ -457,9 +469,10 @@ export class TaskOrchestrator extends EventEmitter {
       `Rework cycles used: ${run.reworkCycles}\n\n` +
       `Only promote patterns that were part of the final passing implementation.`;
 
-    await memoryManager.run({ task: memTask, signal });
+    const result = await memoryManager.run({ task: memTask, signal });
     run.agentStates['memory-manager'] = memoryManager.state;
     this.activeRuns.set(run.id, run);
+    return result.tokenUsage;
   }
 
   // ---------------------------------------------------------------------------
@@ -489,6 +502,7 @@ export class TaskOrchestrator extends EventEmitter {
     run.answer = result.summary;
     run.status = 'answered';
     run.completedAt = Date.now();
+    run.tokenUsage = aggregateTokenUsage([result.tokenUsage]);
 
     this.activeRuns.set(run.id, run);
     this.emit('task:status', this.snapshot(run));
@@ -517,6 +531,7 @@ export class TaskOrchestrator extends EventEmitter {
       provider: this.options.provider,
       projectRoot: this.options.projectRoot,
       customPrompts: {},
+      maxContextTokens: this.options.config.task.max_context_tokens,
     };
 
     const agentsDir = path.join(this.options.projectRoot, '.nightfall', '.agents');
@@ -601,12 +616,28 @@ export class TaskOrchestrator extends EventEmitter {
 
   /**
    * Gather files mentioned in the plan for snapshotting.
-   * Subtask `filesTouched` will be empty at plan time, so this is best-effort.
+   *
+   * Parses subtask descriptions with a regex to find file paths that look like
+   * source files. This is best-effort — the snapshot system handles missing
+   * files gracefully, so false positives are safe.
    */
-  private gatherPlanFiles(_plan: TaskPlan): string[] {
-    // At plan approval time subtasks haven't been executed yet, so we snapshot
-    // an empty list — the snapshot system handles new files gracefully.
-    return [];
+  private gatherPlanFiles(plan: TaskPlan): string[] {
+    const fileSet = new Set<string>();
+    // Match path-like tokens that end with a known source extension
+    const filePattern =
+      /(?:^|[\s'"`([])((?:\.{0,2}\/)?[\w./-]+\.(?:ts|tsx|js|jsx|json|md|yaml|yml|css|html))(?=$|[\s'"`)\],])/gm;
+
+    for (const subtask of plan.subtasks) {
+      for (const match of subtask.description.matchAll(filePattern)) {
+        const filePath = match[1]!.trim();
+        // Skip URLs and node_modules references
+        if (!filePath.includes('://') && !filePath.includes('node_modules')) {
+          fileSet.add(filePath);
+        }
+      }
+    }
+
+    return [...fileSet];
   }
 
   /** Return a shallow immutable copy of a TaskRun. */
@@ -624,6 +655,7 @@ interface EngineerResult {
   summary: string;
   filesChanged: string[];
   interrupted?: boolean;
+  tokenUsage?: import('@nightfall/shared').TokenUsage;
 }
 
 /**
@@ -719,6 +751,26 @@ function buildSubtaskDescription(s: Record<string, unknown>): string {
   }
 
   return desc;
+}
+
+/**
+ * Aggregate token usage from multiple agent runs into a single total.
+ * Undefined/null entries are skipped.
+ */
+function aggregateTokenUsage(usages: Array<TokenUsage | undefined>): TokenUsage | undefined {
+  let promptTokens = 0;
+  let completionTokens = 0;
+  let hasData = false;
+
+  for (const u of usages) {
+    if (!u) continue;
+    promptTokens += u.promptTokens;
+    completionTokens += u.completionTokens;
+    hasData = true;
+  }
+
+  if (!hasData) return undefined;
+  return { promptTokens, completionTokens, totalTokens: promptTokens + completionTokens };
 }
 
 /**

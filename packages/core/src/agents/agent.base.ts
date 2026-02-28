@@ -5,6 +5,7 @@ import type {
   AgentLogEntry,
   ProviderAdapter,
   ChatMessage,
+  TokenUsage,
 } from '@nightfall/shared';
 import type { ToolContext, ToolResult } from '../tools/tool.types.js';
 import { ToolRegistry } from '../tools/tool.registry.js';
@@ -22,6 +23,13 @@ export interface AgentConfig {
   systemPrompt: string;
   /** Maximum number of LLM round-trips before giving up. Defaults to 20. */
   maxIterations?: number;
+  /**
+   * Approximate token budget for the conversation history.
+   * When the estimated token count exceeds this threshold the oldest
+   * tool-call/result pairs are dropped (preserving system + original task).
+   * Tokens are estimated at ~4 chars per token.
+   */
+  maxContextTokens?: number;
 }
 
 export interface AgentRunOptions {
@@ -42,6 +50,8 @@ export interface AgentRunResult {
    * rather than a successful completion.
    */
   interrupted?: boolean;
+  /** Aggregated token usage across all LLM calls in this run. */
+  tokenUsage?: TokenUsage;
 }
 
 // ---------------------------------------------------------------------------
@@ -53,6 +63,30 @@ export interface AgentRunResult {
 export interface BaseAgent {
   on(event: 'state', listener: (state: AgentState) => void): this;
   emit(event: 'state', state: AgentState): boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Approximate token count: ~4 characters per token. */
+function estimateTokens(messages: ChatMessage[]): number {
+  return Math.ceil(messages.reduce((sum, m) => sum + m.content.length, 0) / 4);
+}
+
+/**
+ * Compact `messages` in-place so the estimated token count fits within `budget`.
+ *
+ * Strategy: drop the oldest tool-call/result pairs (indices 2 & 3 after
+ * system + original-task) until the estimate is within budget or no more
+ * pairs remain to drop.
+ */
+function compactMessages(messages: ChatMessage[], budget: number): void {
+  while (estimateTokens(messages) > budget && messages.length > 4) {
+    // messages[0] = system, messages[1] = original task — always preserved.
+    // messages[2] and messages[3] are the oldest assistant/user tool exchange.
+    messages.splice(2, 2);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -102,6 +136,7 @@ export class BaseAgent extends EventEmitter {
   async run(options: AgentRunOptions): Promise<AgentRunResult> {
     const { task, signal } = options;
     const maxIterations = this.config.maxIterations ?? 20;
+    const maxContextTokens = this.config.maxContextTokens;
 
     this.setStatus('thinking', 'Processing task...');
 
@@ -115,11 +150,20 @@ export class BaseAgent extends EventEmitter {
       { role: 'user', content: task },
     ];
 
+    // Accumulated token usage across all LLM calls in this run
+    let totalPromptTokens = 0;
+    let totalCompletionTokens = 0;
+
     for (let iteration = 0; iteration < maxIterations; iteration++) {
       // --- Abort check ---
       if (signal?.aborted) {
         this.setStatus('done', null, 'Cancelled');
         return { summary: 'Cancelled', log: this.state.log };
+      }
+
+      // --- Context window management ---
+      if (maxContextTokens) {
+        compactMessages(messages, maxContextTokens);
       }
 
       // --- LLM call ---
@@ -135,6 +179,13 @@ export class BaseAgent extends EventEmitter {
           lastEmit = now;
         }
         if (signal?.aborted) break;
+      }
+
+      // Accumulate token usage from this iteration
+      const usage = this.provider.getLastUsage?.();
+      if (usage) {
+        totalPromptTokens += usage.promptTokens;
+        totalCompletionTokens += usage.completionTokens;
       }
 
       if (signal?.aborted) {
@@ -189,12 +240,20 @@ export class BaseAgent extends EventEmitter {
       const done = parseDone(response);
       if (done) {
         this.setStatus('done', null, done.summary);
-        return { summary: done.summary, log: this.state.log };
+        return {
+          summary: done.summary,
+          log: this.state.log,
+          tokenUsage: this.buildTokenUsage(totalPromptTokens, totalCompletionTokens),
+        };
       }
 
       // --- No special signal — treat as final answer ---
       this.setStatus('done', null, response.trim());
-      return { summary: response.trim(), log: this.state.log };
+      return {
+        summary: response.trim(),
+        log: this.state.log,
+        tokenUsage: this.buildTokenUsage(totalPromptTokens, totalCompletionTokens),
+      };
     }
 
     // Exhausted max iterations — signal interrupted so the orchestrator can
@@ -205,12 +264,18 @@ export class BaseAgent extends EventEmitter {
       summary: iterationMsg,
       log: this.state.log,
       interrupted: true,
+      tokenUsage: this.buildTokenUsage(totalPromptTokens, totalCompletionTokens),
     };
   }
 
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------
+
+  private buildTokenUsage(promptTokens: number, completionTokens: number): TokenUsage | undefined {
+    if (promptTokens === 0 && completionTokens === 0) return undefined;
+    return { promptTokens, completionTokens, totalTokens: promptTokens + completionTokens };
+  }
 
   private setStatus(
     status: AgentState['status'],

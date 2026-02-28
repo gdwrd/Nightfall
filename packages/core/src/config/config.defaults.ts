@@ -12,6 +12,8 @@ export const DEFAULT_CONFIG: NightfallConfig = {
   },
   task: {
     max_rework_cycles: 3,
+    max_retries: 3,
+    max_context_tokens: 80_000,
   },
   logs: {
     retention: 50,
