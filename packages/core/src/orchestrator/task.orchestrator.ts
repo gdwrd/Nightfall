@@ -10,6 +10,7 @@ import type {
   TaskRun,
   TaskPlan,
   Subtask,
+  FileLock,
 } from '@nightfall/shared';
 import { ToolRegistry } from '../tools/tool.registry.js';
 import { LockRegistry } from '../locks/lock.registry.js';
@@ -53,10 +54,13 @@ export declare interface TaskOrchestrator {
   on(event: 'task:status', listener: (run: TaskRun) => void): this;
   /** Emitted whenever any agent changes state (for live UI updates). */
   on(event: 'agent:state', listener: (state: AgentState) => void): this;
+  /** Emitted whenever the file lock set changes. */
+  on(event: 'lock:update', listener: (locks: FileLock[]) => void): this;
 
   emit(event: 'task:plan-ready', run: TaskRun): boolean;
   emit(event: 'task:status', run: TaskRun): boolean;
   emit(event: 'agent:state', state: AgentState): boolean;
+  emit(event: 'lock:update', locks: FileLock[]): boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -88,6 +92,17 @@ export class TaskOrchestrator extends EventEmitter {
 
     // Wire the shared LockRegistry into the write_diff tool
     setLockRegistry(this.lockRegistry);
+
+    // Forward lock events so the UI can track locked files
+    const emitLocks = () => this.emit('lock:update', this.lockRegistry.getLocks());
+    this.lockRegistry.on('lock_acquired', emitLocks);
+    this.lockRegistry.on('lock_released', emitLocks);
+    this.lockRegistry.on('lock_deadlock', emitLocks);
+  }
+
+  /** Return the current set of held file locks. */
+  getLocks(): FileLock[] {
+    return this.lockRegistry.getLocks();
   }
 
   // ---------------------------------------------------------------------------
