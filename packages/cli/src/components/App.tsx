@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Box, Text, useApp, useInput } from 'ink';
+import { Box, Text, useApp, useInput, useStdout } from 'ink';
 import type { NightfallConfig, TaskRun, AgentState, FileLock, SnapshotMeta } from '@nightfall/shared';
 import type { ProviderLifecycleEvent } from '@nightfall/shared';
 import type { IOrchestrator } from '../ws.client.js';
 import { THEME } from '../theme.js';
 import { Header } from './Header.js';
+import { InfoBar } from './InfoBar.js';
 import { LifecycleView } from './LifecycleView.js';
 import { AgentGrid } from './AgentGrid.js';
 import { StatusBar } from './StatusBar.js';
@@ -16,6 +17,7 @@ import { SlashOutput } from './SlashOutput.js';
 import { SlashAutocomplete } from './SlashAutocomplete.js';
 import { HistoryView } from './HistoryView.js';
 import { RollbackConfirm } from './RollbackConfirm.js';
+import { ThinkingPanel } from './ThinkingPanel.js';
 import { useAppStore } from '../store/app.store.js';
 
 // ---------------------------------------------------------------------------
@@ -26,14 +28,16 @@ interface AppProps {
   config: NightfallConfig;
   orchestrator: IOrchestrator;
   projectRoot: string;
+  memoryInitialized: boolean;
 }
 
 // ---------------------------------------------------------------------------
 // App
 // ---------------------------------------------------------------------------
 
-export const App: React.FC<AppProps> = ({ config, orchestrator }) => {
+export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialized }) => {
   const { exit } = useApp();
+  const { stdout } = useStdout();
   const [state, dispatch] = useAppStore();
   const {
     phase,
@@ -48,11 +52,31 @@ export const App: React.FC<AppProps> = ({ config, orchestrator }) => {
     historySnapshots,
     rollbackChain,
     pendingRollbackSnapshotId,
+    contextLength,
   } = state;
   const [inputValue, setInputValue] = useState('');
   const [awaitingInitConfirm, setAwaitingInitConfirm] = useState(false);
+  const [memoryBankReady, setMemoryBankReady] = useState(memoryInitialized);
 
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  const terminalRows = stdout?.rows ?? 24;
+  const isThinking = phase === 'planning' || phase === 'running';
+
+  // ── Animation: single spinner (only while thinking) ────────────────────────
+  const [spinnerFrame, setSpinnerFrame] = useState(0);
+  useEffect(() => {
+    if (!isThinking) return;
+    const id = setInterval(() => setSpinnerFrame((f) => f + 1), 100);
+    return () => clearInterval(id);
+  }, [isThinking]);
+
+  // ── Animation: clock (always runs, 1 re-render/sec) ───────────────────────
+  const [clockTime, setClockTime] = useState(() => formatTime(new Date()));
+  useEffect(() => {
+    const id = setInterval(() => setClockTime(formatTime(new Date())), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   // ── Provider lifecycle events ──────────────────────────────────────────────
   useEffect(() => {
@@ -91,6 +115,11 @@ export const App: React.FC<AppProps> = ({ config, orchestrator }) => {
   // ── Slash command result wiring ────────────────────────────────────────────
   useEffect(() => {
     const onSlashResult = (payload: { command: string; output: string }) => {
+      // Detect successful /init so the InfoBar updates without restart
+      if (payload.command === '/init' && payload.output.startsWith('✓ Memory bank initialized')) {
+        setMemoryBankReady(true);
+      }
+
       if (payload.command === '/history') {
         try {
           const data = JSON.parse(payload.output) as { type: string; [key: string]: unknown };
@@ -259,7 +288,7 @@ export const App: React.FC<AppProps> = ({ config, orchestrator }) => {
   // Fatal error
   if (phase === 'error') {
     return (
-      <Box flexDirection="column" padding={1}>
+      <Box flexDirection="column" height={terminalRows} padding={1}>
         <Text bold color={THEME.error}>
           Fatal error
         </Text>
@@ -276,7 +305,7 @@ export const App: React.FC<AppProps> = ({ config, orchestrator }) => {
   // Editor is open — show minimal UI
   if (phase === 'editing_plan') {
     return (
-      <Box flexDirection="column" padding={1}>
+      <Box flexDirection="column" height={terminalRows} padding={1}>
         <Text color={THEME.primary}>Opening plan in editor...</Text>
       </Box>
     );
@@ -321,34 +350,51 @@ export const App: React.FC<AppProps> = ({ config, orchestrator }) => {
 
   // Main UI
   return (
-    <Box flexDirection="column">
-      <Header model={config.provider.model} taskStatus={activeRun?.status} />
+    <Box flexDirection="column" height={terminalRows}>
+      <Header
+        model={config.provider.model}
+        taskStatus={activeRun?.status}
+        isThinking={isThinking}
+        spinnerFrame={spinnerFrame}
+        clockTime={clockTime}
+      />
+      <InfoBar
+        provider={config.provider}
+        memoryInitialized={memoryBankReady}
+        contextLength={contextLength}
+      />
 
-      {/* Plan approval view */}
-      {phase === 'awaiting_approval' && activeRun?.plan && <PlanReview plan={activeRun.plan} />}
+      {/* Scrollable content area */}
+      <Box flexDirection="column" flexGrow={1} overflow="hidden">
+        {/* Plan approval view */}
+        {phase === 'awaiting_approval' && activeRun?.plan && <PlanReview plan={activeRun.plan} />}
 
-      {/* Agent panels — visible during execution and after completion */}
-      {Object.keys(agentStates).length > 0 &&
-        (phase === 'running' || phase === 'planning' || phase === 'completed') && (
-          <>
-            <AgentGrid agentStates={agentStates} engineerCount={engineerCount} />
-            {locks.length > 0 && <StatusBar locks={locks} />}
-          </>
+        {/* Agent panels — visible during execution and after completion */}
+        {Object.keys(agentStates).length > 0 &&
+          (phase === 'running' || phase === 'planning' || phase === 'completed') && (
+            <>
+              <AgentGrid agentStates={agentStates} engineerCount={engineerCount} />
+              {locks.length > 0 && <StatusBar locks={locks} />}
+            </>
+          )}
+
+        {/* Message log */}
+        {messages.length > 0 && (
+          <Box flexDirection="column" marginTop={1} paddingX={1}>
+            {messages.map((msg, i) => (
+              <Text key={i} color={messageColor(msg)}>
+                {msg}
+              </Text>
+            ))}
+          </Box>
         )}
 
-      {/* Message log */}
-      {messages.length > 0 && (
-        <Box flexDirection="column" marginTop={1} paddingX={1}>
-          {messages.map((msg, i) => (
-            <Text key={i} color={messageColor(msg)}>
-              {msg}
-            </Text>
-          ))}
-        </Box>
-      )}
+        {/* Slash command output */}
+        {slashOutput !== null && slashOutput !== '' && <SlashOutput output={slashOutput} />}
+      </Box>
 
-      {/* Slash command output */}
-      {slashOutput !== null && slashOutput !== '' && <SlashOutput output={slashOutput} />}
+      {/* Thinking panel — shown while model is active */}
+      {isThinking && <ThinkingPanel agentStates={agentStates} spinnerFrame={spinnerFrame} />}
 
       {/* Slash autocomplete — shown above the input bar while typing */}
       <SlashAutocomplete input={inputValue} />
@@ -368,4 +414,8 @@ function messageColor(msg: string): string {
   if (msg.startsWith('⚠') || msg.startsWith('!')) return THEME.warning;
   if (msg.startsWith('Error') || msg.startsWith('Fatal')) return THEME.error;
   return THEME.textDim;
+}
+
+function formatTime(date: Date): string {
+  return date.toLocaleTimeString(undefined, { hour12: false });
 }

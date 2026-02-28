@@ -123,16 +123,28 @@ export class BaseAgent extends EventEmitter {
       }
 
       // --- LLM call ---
-      this.setStatus('thinking', 'Thinking...');
+      this.setStatus('thinking', '');
       let response = '';
+      let lastEmit = Date.now();
       for await (const chunk of this.provider.complete(messages, signal)) {
         response += chunk;
+        // Throttle: emit a live preview of the streaming response every 200 ms
+        const now = Date.now();
+        if (now - lastEmit >= 200) {
+          this.setStatus('thinking', response.trim());
+          lastEmit = now;
+        }
         if (signal?.aborted) break;
       }
 
       if (signal?.aborted) {
         this.setStatus('done', null, 'Cancelled');
         return { summary: 'Cancelled', log: this.state.log };
+      }
+
+      // Final emit with the complete response text
+      if (response.trim()) {
+        this.setStatus('thinking', response.trim());
       }
 
       this.addLog({ type: 'thought', content: response.trim() });

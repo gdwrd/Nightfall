@@ -11,6 +11,8 @@
  */
 import React from 'react';
 import { render } from 'ink';
+import fs from 'node:fs';
+import path from 'node:path';
 import { loadConfig, createProvider, NightfallServer } from '@nightfall/core';
 import { NightfallWsClient } from './ws.client.js';
 import { App } from './components/App.js';
@@ -63,13 +65,24 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  // ── Check memory bank initialization ──────────────────────────────────────
+  const memoryInitialized = fs.existsSync(
+    path.join(projectRoot, '.nightfall', 'memory', 'index.md'),
+  );
+
+  // ── Enter fullscreen (alternate screen buffer) ─────────────────────────────
+  process.stdout.write('\x1b[?1049h\x1b[2J\x1b[H');
+
   // ── Render the ink UI ──────────────────────────────────────────────────────
   const { waitUntilExit } = render(
-    React.createElement(App, { config, orchestrator: client, projectRoot }),
+    React.createElement(App, { config, orchestrator: client, projectRoot, memoryInitialized }),
     { exitOnCtrlC: false },
   );
 
   await waitUntilExit();
+
+  // ── Exit fullscreen ────────────────────────────────────────────────────────
+  process.stdout.write('\x1b[?1049l');
 
   // ── Cleanup ────────────────────────────────────────────────────────────────
   client.close();
