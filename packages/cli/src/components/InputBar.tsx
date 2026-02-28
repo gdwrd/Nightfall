@@ -4,10 +4,10 @@ import TextInput from 'ink-text-input';
 import { THEME } from '../theme.js';
 
 export type InputMode =
-  | 'idle'          // accept tasks or slash commands
+  | 'idle' // accept tasks or slash commands
   | 'plan_approval' // awaiting y/n/revised prompt
-  | 'running'       // task executing — show hint only
-  | 'completed';    // show completion, accept next task
+  | 'running' // task executing — show hint only
+  | 'completed'; // show completion, accept next task
 
 interface InputBarProps {
   mode: InputMode;

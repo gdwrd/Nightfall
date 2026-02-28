@@ -42,7 +42,9 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) =
       dispatch({ type: 'LIFECYCLE_EVENT', event });
     };
     orchestrator.on('lifecycle', onLifecycle);
-    return () => { orchestrator.off('lifecycle', onLifecycle); };
+    return () => {
+      orchestrator.off('lifecycle', onLifecycle);
+    };
   }, [orchestrator, dispatch]);
 
   // ── Orchestrator event wiring ──────────────────────────────────────────────
@@ -85,7 +87,12 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) =
 
     // Slash commands
     if (input.startsWith('/')) {
-      const result = await handleSlashCommand(input, { config, orchestrator, projectRoot, addMessage });
+      const result = await handleSlashCommand(input, {
+        config,
+        orchestrator,
+        projectRoot,
+        addMessage,
+      });
       if (result === 'exit') {
         exit();
         return;
@@ -143,7 +150,10 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) =
       const ac = new AbortController();
       abortControllerRef.current = ac;
       orchestrator.submitTask(input, ac.signal).catch((err: unknown) => {
-        dispatch({ type: 'ADD_MESSAGE', message: `Error: ${err instanceof Error ? err.message : String(err)}` });
+        dispatch({
+          type: 'ADD_MESSAGE',
+          message: `Error: ${err instanceof Error ? err.message : String(err)}`,
+        });
         dispatch({ type: 'SET_PHASE', phase: 'idle' });
       });
     }
@@ -168,7 +178,9 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) =
   if (phase === 'error') {
     return (
       <Box flexDirection="column" padding={1}>
-        <Text bold color={THEME.error}>Fatal error</Text>
+        <Text bold color={THEME.error}>
+          Fatal error
+        </Text>
         <Text color={THEME.textDim}>{errorMessage}</Text>
       </Box>
     );
@@ -194,9 +206,7 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) =
       <Header model={config.provider.model} taskStatus={activeRun?.status} />
 
       {/* Plan approval view */}
-      {phase === 'awaiting_approval' && activeRun?.plan && (
-        <PlanReview plan={activeRun.plan} />
-      )}
+      {phase === 'awaiting_approval' && activeRun?.plan && <PlanReview plan={activeRun.plan} />}
 
       {/* Agent panels — visible during execution and after completion */}
       {Object.keys(agentStates).length > 0 &&

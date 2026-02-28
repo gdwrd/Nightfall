@@ -50,7 +50,7 @@ export const AgentGrid: React.FC<AgentGridProps> = ({ agentStates, engineerCount
   }
 
   // 2-column grid layout
-  const rows: Array<[typeof panels[0], typeof panels[0] | undefined]> = [];
+  const rows: Array<[(typeof panels)[0], (typeof panels)[0] | undefined]> = [];
   for (let i = 0; i < panels.length; i += 2) {
     rows.push([panels[i]!, panels[i + 1]]);
   }

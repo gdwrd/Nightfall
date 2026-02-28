@@ -7,14 +7,14 @@ import type { AppAction } from './app.actions.js';
 // ---------------------------------------------------------------------------
 
 export type AppPhase =
-  | 'lifecycle'         // Ollama startup in progress
-  | 'idle'             // Ready for user input
-  | 'planning'         // Team Lead drafting the plan
+  | 'lifecycle' // Ollama startup in progress
+  | 'idle' // Ready for user input
+  | 'planning' // Team Lead drafting the plan
   | 'awaiting_approval' // Plan ready, waiting for y/n/e
-  | 'editing_plan'     // External editor open for plan editing
-  | 'running'          // Engineers / reviewer executing
-  | 'completed'        // Task finished
-  | 'error';           // Fatal error
+  | 'editing_plan' // External editor open for plan editing
+  | 'running' // Engineers / reviewer executing
+  | 'completed' // Task finished
+  | 'error'; // Fatal error
 
 export interface AppState {
   phase: AppPhase;
@@ -61,11 +61,17 @@ function reducer(state: AppState, action: AppAction): AppState {
       let phase: AppPhase = state.phase;
 
       switch (run.status) {
-        case 'planning':           phase = 'planning'; break;
-        case 'awaiting_approval':  phase = 'awaiting_approval'; break;
+        case 'planning':
+          phase = 'planning';
+          break;
+        case 'awaiting_approval':
+          phase = 'awaiting_approval';
+          break;
         case 'running':
         case 'reviewing':
-        case 'reworking':          phase = 'running'; break;
+        case 'reworking':
+          phase = 'running';
+          break;
         case 'completed':
           phase = 'completed';
           messages.push('✓ Task completed successfully.');
@@ -116,9 +122,7 @@ function reducer(state: AppState, action: AppAction): AppState {
     case 'UPDATE_PLAN':
       return {
         ...state,
-        activeRun: state.activeRun
-          ? { ...state.activeRun, plan: action.plan }
-          : null,
+        activeRun: state.activeRun ? { ...state.activeRun, plan: action.plan } : null,
       };
 
     default:

@@ -29,11 +29,7 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({ label, state }) => {
 
   const borderColor = isActive ? THEME.accent : isDone ? THEME.success : THEME.dimBorder;
 
-  const labelColor = isThinking
-    ? THEME.accent
-    : isActing
-      ? THEME.text
-      : THEME.textDim;
+  const labelColor = isThinking ? THEME.accent : isActing ? THEME.text : THEME.textDim;
 
   // Recent log entries (last 4)
   const recentLog = (state?.log ?? []).slice(-4);

@@ -92,7 +92,9 @@ export class WsBroadcaster {
 
     return {
       getPendingTaskId: () => pendingApprovalTaskId,
-      clearPendingTaskId: () => { pendingApprovalTaskId = null; },
+      clearPendingTaskId: () => {
+        pendingApprovalTaskId = null;
+      },
     };
   }
 }

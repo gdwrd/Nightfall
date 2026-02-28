@@ -1,5 +1,11 @@
 import { EventEmitter } from 'node:events';
-import type { AgentRole, AgentState, AgentLogEntry, ProviderAdapter, ChatMessage } from '@nightfall/shared';
+import type {
+  AgentRole,
+  AgentState,
+  AgentLogEntry,
+  ProviderAdapter,
+  ChatMessage,
+} from '@nightfall/shared';
 import type { ToolContext, ToolResult } from '../tools/tool.types.js';
 import { ToolRegistry } from '../tools/tool.registry.js';
 import { buildSystemPrompt } from './agent.prompts.js';
@@ -39,10 +45,12 @@ export interface AgentRunResult {
 }
 
 // ---------------------------------------------------------------------------
-// Event declarations
+// Event declarations (declaration merging is the standard Node.js pattern
+// for typed EventEmitters — safe to use here)
 // ---------------------------------------------------------------------------
 
-export declare interface BaseAgent {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface BaseAgent {
   on(event: 'state', listener: (state: AgentState) => void): this;
   emit(event: 'state', state: AgentState): boolean;
 }
@@ -59,6 +67,7 @@ export declare interface BaseAgent {
  * All 4 agent roles (team-lead, engineer, reviewer, memory-manager) are
  * instances of this class with different configs and system prompts.
  */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class BaseAgent extends EventEmitter {
   protected readonly config: AgentConfig;
   protected readonly provider: ProviderAdapter;
@@ -191,7 +200,11 @@ export class BaseAgent extends EventEmitter {
   // Private helpers
   // ---------------------------------------------------------------------------
 
-  private setStatus(status: AgentState['status'], currentAction: string | null, summary?: string): void {
+  private setStatus(
+    status: AgentState['status'],
+    currentAction: string | null,
+    summary?: string,
+  ): void {
     this._state = { ...this._state, status, currentAction };
     if (summary !== undefined) {
       this._state = { ...this._state, summary };

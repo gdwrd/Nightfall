@@ -44,10 +44,12 @@ export interface ReviewResult {
 }
 
 // ---------------------------------------------------------------------------
-// Event type augmentation
+// Event type augmentation (declaration merging is the standard Node.js
+// pattern for typed EventEmitters — safe to use here)
 // ---------------------------------------------------------------------------
 
-export declare interface TaskOrchestrator {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface TaskOrchestrator {
   /** Emitted when the Team Lead has produced a plan ready for user approval. */
   on(event: 'task:plan-ready', listener: (run: TaskRun) => void): this;
   /** Emitted on any TaskRun status transition. */
@@ -75,6 +77,7 @@ export declare interface TaskOrchestrator {
  *
  * All phases honour an AbortSignal for graceful Ctrl+C cancellation.
  */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class TaskOrchestrator extends EventEmitter {
   private readonly options: OrchestratorOptions;
   private readonly lockRegistry: LockRegistry;
@@ -272,10 +275,7 @@ export class TaskOrchestrator extends EventEmitter {
   // Engineer stage
   // ---------------------------------------------------------------------------
 
-  private async runEngineers(
-    run: TaskRun,
-    signal?: AbortSignal,
-  ): Promise<EngineerResult[]> {
+  private async runEngineers(run: TaskRun, signal?: AbortSignal): Promise<EngineerResult[]> {
     if (!run.plan) return [];
 
     const maxEngineers = this.options.config.concurrency.max_engineers;
@@ -561,7 +561,10 @@ function extractFilesTouched(log: AgentLogEntry[]): string[] {
   for (const entry of log) {
     if (entry.type !== 'tool_call') continue;
     try {
-      const call = JSON.parse(entry.content) as { tool: string; parameters: Record<string, unknown> };
+      const call = JSON.parse(entry.content) as {
+        tool: string;
+        parameters: Record<string, unknown>;
+      };
       if (call.tool === 'write_diff') {
         const filePath = String(call.parameters['path'] ?? '').trim();
         if (filePath) files.add(filePath);
@@ -629,13 +632,15 @@ function buildSubtaskDescription(s: Record<string, unknown>): string {
 
   const criteria = Array.isArray(s['successCriteria']) ? s['successCriteria'].map(String) : [];
   if (criteria.length > 0) {
-    desc += `\n\nSuccess criteria (your done signal must satisfy all of these):\n` +
+    desc +=
+      `\n\nSuccess criteria (your done signal must satisfy all of these):\n` +
       criteria.map((c) => `- ${c}`).join('\n');
   }
 
   const constraints = Array.isArray(s['constraints']) ? s['constraints'].map(String) : [];
   if (constraints.length > 0) {
-    desc += `\n\nConstraints (hard requirements — do not violate):\n` +
+    desc +=
+      `\n\nConstraints (hard requirements — do not violate):\n` +
       constraints.map((c) => `- ${c}`).join('\n');
   }
 

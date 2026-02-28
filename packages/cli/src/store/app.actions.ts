@@ -1,4 +1,10 @@
-import type { TaskRun, TaskPlan, AgentState, FileLock, OllamaLifecycleEvent } from '@nightfall/shared';
+import type {
+  TaskRun,
+  TaskPlan,
+  AgentState,
+  FileLock,
+  OllamaLifecycleEvent,
+} from '@nightfall/shared';
 import type { AppPhase } from './app.store.js';
 
 // ---------------------------------------------------------------------------

@@ -14,8 +14,7 @@ export const AgentPanelCollapsed: React.FC<AgentPanelCollapsedProps> = ({ label,
   const color = isError ? THEME.error : THEME.success;
 
   // Prefer the summary field; fall back to last log entry content
-  const summaryText =
-    state.summary ?? state.log[state.log.length - 1]?.content ?? 'completed';
+  const summaryText = state.summary ?? state.log[state.log.length - 1]?.content ?? 'completed';
 
   return (
     <Box borderStyle="single" borderColor={color} paddingX={1}>

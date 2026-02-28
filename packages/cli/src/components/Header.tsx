@@ -19,9 +19,7 @@ export const Header: React.FC<HeaderProps> = ({ model, taskStatus }) => {
         🌑 NIGHTFALL
       </Text>
       <Box gap={2}>
-        {taskStatus && (
-          <Text color={taskStatusColor(taskStatus)}>{taskStatus}</Text>
-        )}
+        {taskStatus && <Text color={taskStatusColor(taskStatus)}>{taskStatus}</Text>}
         <Text color={THEME.accent}>model: {model}</Text>
       </Box>
     </Box>

@@ -10,9 +10,7 @@ interface StatusBarProps {
 export const StatusBar: React.FC<StatusBarProps> = ({ locks }) => {
   if (locks.length === 0) return null;
 
-  const lockText = locks
-    .map((l) => `${l.path} (${l.lockedBy})`)
-    .join('  ');
+  const lockText = locks.map((l) => `${l.path} (${l.lockedBy})`).join('  ');
 
   return (
     <Box borderStyle="single" borderColor={THEME.accent} paddingX={1}>

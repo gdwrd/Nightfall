@@ -229,9 +229,7 @@ describe('TaskOrchestrator.submitTask', () => {
   });
 
   it('returns a TaskRun in awaiting_approval status after planning', async () => {
-    const provider = makeProvider([
-      planDone([{ id: 'subtask-1', description: 'Do the thing' }]),
-    ]);
+    const provider = makeProvider([planDone([{ id: 'subtask-1', description: 'Do the thing' }])]);
     const orchestrator = new TaskOrchestrator({
       config: makeConfig(),
       provider,
@@ -246,9 +244,7 @@ describe('TaskOrchestrator.submitTask', () => {
   });
 
   it('emits task:plan-ready event', async () => {
-    const provider = makeProvider([
-      planDone([{ id: 's1', description: 'Implement feature' }]),
-    ]);
+    const provider = makeProvider([planDone([{ id: 's1', description: 'Implement feature' }])]);
     const orchestrator = new TaskOrchestrator({
       config: makeConfig(),
       provider,
@@ -264,9 +260,7 @@ describe('TaskOrchestrator.submitTask', () => {
   });
 
   it('emits task:status events for planning and awaiting_approval', async () => {
-    const provider = makeProvider([
-      planDone([{ id: 's1', description: 'task' }]),
-    ]);
+    const provider = makeProvider([planDone([{ id: 's1', description: 'task' }])]);
     const orchestrator = new TaskOrchestrator({
       config: makeConfig(),
       provider,
@@ -300,9 +294,7 @@ describe('TaskOrchestrator.submitTask', () => {
     const controller = new AbortController();
     controller.abort();
 
-    const provider = makeProvider([
-      planDone([{ id: 's1', description: 'task' }]),
-    ]);
+    const provider = makeProvider([planDone([{ id: 's1', description: 'task' }])]);
     const orchestrator = new TaskOrchestrator({
       config: makeConfig(),
       provider,
@@ -314,9 +306,7 @@ describe('TaskOrchestrator.submitTask', () => {
   });
 
   it('getTaskRun returns the current state of the run', async () => {
-    const provider = makeProvider([
-      planDone([{ id: 's1', description: 'task' }]),
-    ]);
+    const provider = makeProvider([planDone([{ id: 's1', description: 'task' }])]);
     const orchestrator = new TaskOrchestrator({
       config: makeConfig(),
       provider,
@@ -561,9 +551,7 @@ describe('TaskOrchestrator — error handling', () => {
   });
 
   it('throws when approvePlan is called before planning is done', async () => {
-    const provider = makeProvider([
-      planDone([{ id: 's1', description: 'task' }]),
-    ]);
+    const provider = makeProvider([planDone([{ id: 's1', description: 'task' }])]);
     const orchestrator = new TaskOrchestrator({
       config: makeConfig(),
       provider,
@@ -573,11 +561,14 @@ describe('TaskOrchestrator — error handling', () => {
     const run = await orchestrator.submitTask('task');
     // Change status manually to simulate a non-awaiting_approval state
     // (we can't easily do this without casting, so we test via double-approve)
-    await orchestrator.approvePlan(run.id, (() => {
-      const c = new AbortController();
-      c.abort();
-      return c.signal;
-    })());
+    await orchestrator.approvePlan(
+      run.id,
+      (() => {
+        const c = new AbortController();
+        c.abort();
+        return c.signal;
+      })(),
+    );
 
     // Second approve on the same id should throw because status is no longer awaiting_approval
     await expect(orchestrator.approvePlan(run.id)).rejects.toThrow();
@@ -596,16 +587,8 @@ describe('TaskOrchestrator — error handling', () => {
       ensureModelReady: async () => {},
     };
 
-    const orchestrator = new TaskOrchestrator({
-      config: makeConfig(),
-      provider,
-      projectRoot: tmpDir,
-    });
-
     // We need to first get a plan. Use a separate provider for planning.
-    const planProvider = makeProvider([
-      planDone([{ id: 's1', description: 'task' }]),
-    ]);
+    const planProvider = makeProvider([planDone([{ id: 's1', description: 'task' }])]);
     const plannedOrchestrator = new TaskOrchestrator({
       config: makeConfig(),
       provider: planProvider,
