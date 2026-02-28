@@ -9,7 +9,7 @@ export type ProviderLifecycleEvent =
   | { type: 'detecting' }
   | { type: 'ready' }
   | { type: 'checking_model'; model: string }
-  | { type: 'model_ready'; model: string }
+  | { type: 'model_ready'; model: string; contextLength?: number }
   | { type: 'fatal'; message: string }
   // Ollama-specific events
   | { type: 'starting' }

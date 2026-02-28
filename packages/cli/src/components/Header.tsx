@@ -2,12 +2,23 @@ import React from 'react';
 import { Box, Text } from 'ink';
 import { THEME } from '../theme.js';
 
+const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
 interface HeaderProps {
   model: string;
   taskStatus?: string;
+  isThinking: boolean;
+  spinnerFrame: number;
+  clockTime: string;
 }
 
-export const Header: React.FC<HeaderProps> = ({ model, taskStatus }) => {
+export const Header: React.FC<HeaderProps> = ({
+  model,
+  taskStatus,
+  isThinking,
+  spinnerFrame,
+  clockTime,
+}) => {
   return (
     <Box
       borderStyle="single"
@@ -15,12 +26,18 @@ export const Header: React.FC<HeaderProps> = ({ model, taskStatus }) => {
       paddingX={1}
       justifyContent="space-between"
     >
-      <Text bold color={THEME.primary}>
-        🌑 NIGHTFALL
-      </Text>
+      <Box gap={1}>
+        {isThinking && (
+          <Text color={THEME.primary}>{SPINNER_FRAMES[spinnerFrame % SPINNER_FRAMES.length]}</Text>
+        )}
+        <Text bold color={THEME.primary}>
+          🌑 NIGHTFALL
+        </Text>
+      </Box>
       <Box gap={2}>
         {taskStatus && <Text color={taskStatusColor(taskStatus)}>{taskStatus}</Text>}
         <Text color={THEME.accent}>model: {model}</Text>
+        <Text color={THEME.dim}>{clockTime}</Text>
       </Box>
     </Box>
   );

@@ -189,7 +189,27 @@ export async function ensureOllama(
     }
   }
 
-  onEvent({ type: 'model_ready', model });
+  let contextLength: number | undefined;
+  try {
+    const showRes = await fetch(`http://${host}:${port}/api/show`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: model }),
+      signal: AbortSignal.timeout(3000),
+    });
+    if (showRes.ok) {
+      const data = (await showRes.json()) as Record<string, unknown>;
+      const modelInfo = data['model_info'] as Record<string, unknown> | undefined;
+      if (modelInfo) {
+        const ctxKey = Object.keys(modelInfo).find((k) => k.endsWith('.context_length'));
+        if (ctxKey) contextLength = modelInfo[ctxKey] as number;
+      }
+    }
+  } catch {
+    // non-fatal — context length is optional
+  }
+
+  onEvent({ type: 'model_ready', model, contextLength });
 }
 
 function sleep(ms: number): Promise<void> {

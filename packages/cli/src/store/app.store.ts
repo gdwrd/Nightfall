@@ -31,6 +31,7 @@ export interface AppState {
   historySnapshots: SnapshotMeta[];
   rollbackChain: SnapshotMeta[];
   pendingRollbackSnapshotId: string | null;
+  contextLength: number | null;
 }
 
 const initialState: AppState = {
@@ -46,6 +47,7 @@ const initialState: AppState = {
   historySnapshots: [],
   rollbackChain: [],
   pendingRollbackSnapshotId: null,
+  contextLength: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -57,7 +59,11 @@ function reducer(state: AppState, action: AppAction): AppState {
     case 'LIFECYCLE_EVENT': {
       const base = { ...state, lifecycleEvent: action.event };
       if (action.event.type === 'model_ready') {
-        return { ...base, phase: 'idle' };
+        return {
+          ...base,
+          phase: 'idle',
+          contextLength: action.event.contextLength ?? null,
+        };
       }
       if (action.event.type === 'fatal') {
         return { ...base, phase: 'error', errorMessage: action.event.message };
