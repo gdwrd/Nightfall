@@ -5,6 +5,7 @@ import type {
   ServerMessage,
   OllamaLifecycleEvent,
   TaskRun,
+  TaskPlan,
   AgentState,
   FileLock,
 } from '@nightfall/shared';
@@ -31,7 +32,7 @@ export interface IOrchestrator extends EventEmitter {
   off(event: string, listener: (...args: unknown[]) => void): this;
 
   submitTask(prompt: string, signal?: AbortSignal): Promise<TaskRun>;
-  approvePlan(taskId: string, signal?: AbortSignal): Promise<TaskRun>;
+  approvePlan(taskId: string, signal?: AbortSignal, editedPlan?: TaskPlan): Promise<TaskRun>;
   getLocks(): FileLock[];
 }
 
@@ -133,7 +134,7 @@ export class NightfallWsClient extends EventEmitter implements IOrchestrator {
    * Approve the pending plan and begin task execution.
    * Resolves when the task reaches a terminal state.
    */
-  approvePlan(_taskId: string, signal?: AbortSignal): Promise<TaskRun> {
+  approvePlan(_taskId: string, signal?: AbortSignal, editedPlan?: TaskPlan): Promise<TaskRun> {
     return new Promise((resolve, reject) => {
       if (signal?.aborted) {
         reject(new Error('Aborted'));
@@ -160,7 +161,7 @@ export class NightfallWsClient extends EventEmitter implements IOrchestrator {
       this.on('task:status', onStatus);
       signal?.addEventListener('abort', onAbort, { once: true });
 
-      this.send({ type: 'APPROVE_PLAN', payload: {} });
+      this.send({ type: 'APPROVE_PLAN', payload: editedPlan ? { editedPlan } : {} });
     });
   }
 

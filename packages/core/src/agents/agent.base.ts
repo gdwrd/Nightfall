@@ -1,5 +1,11 @@
 import { EventEmitter } from 'node:events';
-import type { AgentRole, AgentState, AgentLogEntry, ProviderAdapter, ChatMessage } from '@nightfall/shared';
+import type {
+  AgentRole,
+  AgentState,
+  AgentLogEntry,
+  ProviderAdapter,
+  ChatMessage,
+} from '@nightfall/shared';
 import type { ToolContext, ToolResult } from '../tools/tool.types.js';
 import { ToolRegistry } from '../tools/tool.registry.js';
 import { buildSystemPrompt } from './agent.prompts.js';
@@ -39,10 +45,12 @@ export interface AgentRunResult {
 }
 
 // ---------------------------------------------------------------------------
-// Event declarations
+// Event declarations (declaration merging is the standard Node.js pattern
+// for typed EventEmitters — safe to use here)
 // ---------------------------------------------------------------------------
 
-export declare interface BaseAgent {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface BaseAgent {
   on(event: 'state', listener: (state: AgentState) => void): this;
   emit(event: 'state', state: AgentState): boolean;
 }
@@ -59,6 +67,7 @@ export declare interface BaseAgent {
  * All 4 agent roles (team-lead, engineer, reviewer, memory-manager) are
  * instances of this class with different configs and system prompts.
  */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class BaseAgent extends EventEmitter {
   protected readonly config: AgentConfig;
   protected readonly provider: ProviderAdapter;
@@ -109,7 +118,7 @@ export class BaseAgent extends EventEmitter {
     for (let iteration = 0; iteration < maxIterations; iteration++) {
       // --- Abort check ---
       if (signal?.aborted) {
-        this.setStatus('done', null);
+        this.setStatus('done', null, 'Cancelled');
         return { summary: 'Cancelled', log: this.state.log };
       }
 
@@ -122,7 +131,7 @@ export class BaseAgent extends EventEmitter {
       }
 
       if (signal?.aborted) {
-        this.setStatus('done', null);
+        this.setStatus('done', null, 'Cancelled');
         return { summary: 'Cancelled', log: this.state.log };
       }
 
@@ -167,20 +176,21 @@ export class BaseAgent extends EventEmitter {
       // --- Done signal? ---
       const done = parseDone(response);
       if (done) {
-        this.setStatus('done', null);
+        this.setStatus('done', null, done.summary);
         return { summary: done.summary, log: this.state.log };
       }
 
       // --- No special signal — treat as final answer ---
-      this.setStatus('done', null);
+      this.setStatus('done', null, response.trim());
       return { summary: response.trim(), log: this.state.log };
     }
 
     // Exhausted max iterations — signal interrupted so the orchestrator can
     // treat this as a blocked result rather than a successful completion.
-    this.setStatus('done', null);
+    const iterationMsg = `Agent reached maximum iteration limit (${maxIterations})`;
+    this.setStatus('done', null, iterationMsg);
     return {
-      summary: `Agent reached maximum iteration limit (${maxIterations})`,
+      summary: iterationMsg,
       log: this.state.log,
       interrupted: true,
     };
@@ -190,8 +200,15 @@ export class BaseAgent extends EventEmitter {
   // Private helpers
   // ---------------------------------------------------------------------------
 
-  private setStatus(status: AgentState['status'], currentAction: string | null): void {
+  private setStatus(
+    status: AgentState['status'],
+    currentAction: string | null,
+    summary?: string,
+  ): void {
     this._state = { ...this._state, status, currentAction };
+    if (summary !== undefined) {
+      this._state = { ...this._state, summary };
+    }
     this.emit('state', this.state);
   }
 

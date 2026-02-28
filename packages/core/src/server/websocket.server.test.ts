@@ -1,7 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as net from 'node:net';
 import { WebSocket } from 'ws';
-import type { ProviderAdapter, ChatMessage, NightfallConfig, ServerMessage } from '@nightfall/shared';
+import type {
+  ProviderAdapter,
+  ChatMessage,
+  NightfallConfig,
+  ServerMessage,
+} from '@nightfall/shared';
 import { NightfallServer } from './websocket.server.js';
 
 // ---------------------------------------------------------------------------
@@ -94,7 +99,9 @@ function collectUntil(
           clearTimeout(timer);
           done();
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     });
 
     ws.on('error', (err) => {
@@ -127,14 +134,24 @@ describe('NightfallServer', () => {
   });
 
   it('reports the correct port', () => {
-    server = new NightfallServer({ config: makeConfig(), provider: makeProvider(), projectRoot: '/tmp', port });
+    server = new NightfallServer({
+      config: makeConfig(),
+      provider: makeProvider(),
+      projectRoot: '/tmp',
+      port,
+    });
     expect(server.port).toBe(port);
   });
 
   it('accepts WebSocket connections and can be closed cleanly', async () => {
     // NightfallServer starts listening as soon as it is constructed (WS server
     // binds in the constructor).  start() wires orchestrator events and Ollama.
-    server = new NightfallServer({ config: makeConfig(), provider: makeProvider(), projectRoot: '/tmp', port });
+    server = new NightfallServer({
+      config: makeConfig(),
+      provider: makeProvider(),
+      projectRoot: '/tmp',
+      port,
+    });
     server.start();
 
     // Simply verify a client can connect without error.
@@ -149,7 +166,12 @@ describe('NightfallServer', () => {
   });
 
   it('sends ERROR when APPROVE_PLAN is called with no pending task', async () => {
-    server = new NightfallServer({ config: makeConfig(), provider: makeProvider(), projectRoot: '/tmp', port });
+    server = new NightfallServer({
+      config: makeConfig(),
+      provider: makeProvider(),
+      projectRoot: '/tmp',
+      port,
+    });
     server.start();
 
     const { msgs, ws } = await collectUntil(
@@ -166,9 +188,7 @@ describe('NightfallServer', () => {
   });
 
   it('broadcasts TASK_STATE(planning) after SUBMIT_TASK', async () => {
-    const provider = makeProvider([
-      planDone([{ id: 's1', description: 'Write the feature' }]),
-    ]);
+    const provider = makeProvider([planDone([{ id: 's1', description: 'Write the feature' }])]);
     server = new NightfallServer({ config: makeConfig(), provider, projectRoot: '/tmp', port });
     server.start();
 
@@ -186,9 +206,7 @@ describe('NightfallServer', () => {
   });
 
   it('broadcasts PLAN_READY after SUBMIT_TASK completes planning', async () => {
-    const provider = makeProvider([
-      planDone([{ id: 's1', description: 'Write the feature' }]),
-    ]);
+    const provider = makeProvider([planDone([{ id: 's1', description: 'Write the feature' }])]);
     server = new NightfallServer({ config: makeConfig(), provider, projectRoot: '/tmp', port });
     server.start();
 

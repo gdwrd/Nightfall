@@ -1,7 +1,6 @@
 import type { NightfallConfig } from '@nightfall/shared';
 import { initializeMemoryBank, TaskLogger } from '@nightfall/core';
 import type { IOrchestrator } from './ws.client.js';
-import * as path from 'node:path';
 
 // ---------------------------------------------------------------------------
 // Slash command registry
@@ -79,10 +78,9 @@ export async function handleSlashCommand(
       return 'exit';
 
     default:
+      void args; // args reserved for future sub-commands
       return `Unknown command: ${command}. Type /help for available commands.`;
   }
-
-  void args; // args reserved for future sub-commands
 }
 
 // ---------------------------------------------------------------------------

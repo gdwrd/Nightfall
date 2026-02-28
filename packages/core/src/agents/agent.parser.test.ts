@@ -53,21 +53,22 @@ describe('parseDone', () => {
     expect(parseDone(response)).toEqual({ summary: 'Files updated' });
   });
 
-  it('uses "Done" as default summary when field is missing', () => {
+  it('passes structured JSON through as raw summary when no string summary field', () => {
     const result = parseDone('<done>{}</done>');
-    expect(result?.summary).toBe('Done');
+    expect(result?.summary).toBe('{}');
   });
 
-  it('uses "Done" when summary is not a string', () => {
+  it('passes structured JSON through when summary is not a string', () => {
     const result = parseDone('<done>{"summary":42}</done>');
-    expect(result?.summary).toBe('Done');
+    expect(result?.summary).toBe('{"summary":42}');
   });
 
   it('returns null when no done block is present', () => {
     expect(parseDone('Still working on it.')).toBeNull();
   });
 
-  it('returns null for a malformed JSON block', () => {
-    expect(parseDone('<done>broken json</done>')).toBeNull();
+  it('uses plain text as summary for non-JSON content', () => {
+    const result = parseDone('<done>broken json</done>');
+    expect(result?.summary).toBe('broken json');
   });
 });

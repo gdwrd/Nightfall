@@ -1,7 +1,8 @@
 import React from 'react';
-import { Box } from 'ink';
+import { Box, useStdout } from 'ink';
 import type { AgentState } from '@nightfall/shared';
 import { AgentPanel } from './AgentPanel.js';
+import { AgentPanelCollapsed } from './AgentPanelCollapsed.js';
 
 interface AgentGridProps {
   agentStates: Record<string, AgentState>;
@@ -10,8 +11,12 @@ interface AgentGridProps {
 }
 
 export const AgentGrid: React.FC<AgentGridProps> = ({ agentStates, engineerCount }) => {
-  // Build the list of panels to display
-  const panels: Array<{ id: string; label: string }> = [
+  const { stdout } = useStdout();
+  const columns = stdout?.columns ?? 80;
+  const singleColumn = columns < 80;
+
+  // Build the full list of possible panels
+  const allPanels: Array<{ id: string; label: string }> = [
     { id: 'team-lead', label: 'TEAM LEAD' },
     ...Array.from({ length: Math.max(engineerCount, 1) }, (_, i) => ({
       id: `engineer-${i + 1}`,
@@ -20,8 +25,32 @@ export const AgentGrid: React.FC<AgentGridProps> = ({ agentStates, engineerCount
     { id: 'reviewer', label: 'REVIEWER' },
   ];
 
-  // Pair into rows of 2
-  const rows: Array<[typeof panels[0], typeof panels[0] | undefined]> = [];
+  // Only show agents that have been activated (have state in agentStates)
+  const panels = allPanels.filter((p) => agentStates[p.id] !== undefined);
+
+  if (panels.length === 0) return null;
+
+  const renderPanel = (panel: (typeof panels)[0]) => {
+    const panelState = agentStates[panel.id];
+    if (isPanelCollapsed(panel.id, agentStates) && panelState) {
+      return <AgentPanelCollapsed label={panel.label} state={panelState} />;
+    }
+    return <AgentPanel label={panel.label} state={panelState} />;
+  };
+
+  // Single-column layout for narrow terminals
+  if (singleColumn) {
+    return (
+      <Box flexDirection="column">
+        {panels.map((panel) => (
+          <Box key={panel.id}>{renderPanel(panel)}</Box>
+        ))}
+      </Box>
+    );
+  }
+
+  // 2-column grid layout
+  const rows: Array<[(typeof panels)[0], (typeof panels)[0] | undefined]> = [];
   for (let i = 0; i < panels.length; i += 2) {
     rows.push([panels[i]!, panels[i + 1]]);
   }
@@ -31,19 +60,11 @@ export const AgentGrid: React.FC<AgentGridProps> = ({ agentStates, engineerCount
       {rows.map((row, rowIdx) => (
         <Box key={rowIdx} flexDirection="row">
           <Box flexGrow={1} flexBasis={0}>
-            <AgentPanel
-              label={row[0].label}
-              state={agentStates[row[0].id]}
-              collapsed={isPanelCollapsed(row[0].id, agentStates)}
-            />
+            {renderPanel(row[0])}
           </Box>
           {row[1] && (
             <Box flexGrow={1} flexBasis={0}>
-              <AgentPanel
-                label={row[1].label}
-                state={agentStates[row[1].id]}
-                collapsed={isPanelCollapsed(row[1].id, agentStates)}
-              />
+              {renderPanel(row[1])}
             </Box>
           )}
         </Box>
