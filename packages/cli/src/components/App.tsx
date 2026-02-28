@@ -35,6 +35,7 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) =
   const [state, dispatch] = useAppStore();
   const { phase, lifecycleEvent, activeRun, agentStates, locks, messages, errorMessage, slashOutput } = state;
   const [inputValue, setInputValue] = useState('');
+  const [awaitingInitConfirm, setAwaitingInitConfirm] = useState(false);
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -98,6 +99,19 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) =
   const handleInput = (input: string) => {
     const addMessage = (msg: string) => dispatch({ type: 'ADD_MESSAGE', message: msg });
 
+    // /init confirmation prompt
+    if (awaitingInitConfirm) {
+      const lower = input.toLowerCase();
+      if (lower === 'y' || lower === 'yes') {
+        setAwaitingInitConfirm(false);
+        orchestrator.sendSlashCommand('/init', 'confirm');
+      } else if (lower === 'n' || lower === 'no') {
+        setAwaitingInitConfirm(false);
+        dispatch({ type: 'SET_SLASH_OUTPUT', output: 'Cancelled.' });
+      }
+      return;
+    }
+
     // Slash commands
     if (input.startsWith('/')) {
       const lower = input.trim().toLowerCase();
@@ -110,6 +124,7 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) =
 
       // Handle clear locally — resets CLI state only
       if (lower === '/clear') {
+        setAwaitingInitConfirm(false);
         dispatch({ type: 'CLEAR_MESSAGES' });
         dispatch({ type: 'SET_SLASH_OUTPUT', output: null });
         return;
@@ -124,6 +139,12 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) =
 
       // Route to server — result arrives via 'slash:result' event
       orchestrator.sendSlashCommand(cmd, args);
+
+      // Track init preview awaiting confirmation
+      if (cmd === '/init' && args === '') {
+        setAwaitingInitConfirm(true);
+      }
+
       return;
     }
 
@@ -182,8 +203,9 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) =
   };
 
   // ── Derive InputBar mode ───────────────────────────────────────────────────
-  const inputMode: InputMode =
-    phase === 'running' || phase === 'planning' || phase === 'editing_plan'
+  const inputMode: InputMode = awaitingInitConfirm
+    ? 'init_confirm'
+    : phase === 'running' || phase === 'planning' || phase === 'editing_plan'
       ? 'running'
       : phase === 'awaiting_approval'
         ? 'plan_approval'

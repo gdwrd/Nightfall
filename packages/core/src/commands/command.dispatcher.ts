@@ -37,7 +37,7 @@ export class CommandDispatcher {
         return helpHandler();
 
       case '/init':
-        return initHandler(this.ctx);
+        return initHandler(this.ctx, _args);
 
       case '/status':
         return statusHandler(this.ctx);
