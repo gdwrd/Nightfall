@@ -4,10 +4,11 @@ import type {
   NightfallConfig,
   ProviderAdapter,
   ClientMessage,
-  OllamaLifecycleEvent,
+  ProviderLifecycleEvent,
 } from '@nightfall/shared';
 import { TaskOrchestrator } from '../orchestrator/task.orchestrator.js';
 import { ensureOllama } from '../ollama/ollama.lifecycle.js';
+import { ensureOpenRouter } from '../providers/openrouter/openrouter.lifecycle.js';
 import { WsBroadcaster } from './ws.broadcaster.js';
 import type { PendingApprovalHandle } from './ws.broadcaster.js';
 import { CommandDispatcher } from '../commands/command.dispatcher.js';
@@ -29,7 +30,7 @@ export interface NightfallServerOptions {
 // ---------------------------------------------------------------------------
 
 /**
- * Core WebSocket server that wraps the TaskOrchestrator and Ollama lifecycle.
+ * Core WebSocket server that wraps the TaskOrchestrator and provider lifecycle.
  *
  * The protocol is defined by ClientMessage / ServerMessage in @nightfall/shared.
  * Any UI (CLI, web, VS Code extension) can connect to this server on localhost
@@ -40,7 +41,7 @@ export interface NightfallServerOptions {
  *
  * On start():
  *   - Opens a WS server on `port`
- *   - Starts Ollama lifecycle (broadcasts LIFECYCLE events)
+ *   - Starts provider lifecycle (broadcasts LIFECYCLE events)
  *   - Wires TaskOrchestrator events → WS broadcasts via WsBroadcaster
  *   - Accepts and routes ClientMessages from connected clients
  */
@@ -90,12 +91,12 @@ export class NightfallServer extends EventEmitter {
    * Start the server:
    * 1. Wire orchestrator events → WS broadcasts
    * 2. Begin accepting WS connections
-   * 3. Start Ollama lifecycle (broadcasts LIFECYCLE messages)
+   * 3. Start provider lifecycle (broadcasts LIFECYCLE messages)
    */
   start(): void {
     this.approval = this.broadcaster.wireOrchestrator(this.orchestrator);
     this.wss.on('connection', (ws) => this.handleConnection(ws));
-    this.startOllamaLifecycle();
+    this.startProviderLifecycle();
   }
 
   /** Gracefully close the WS server. */
@@ -106,13 +107,20 @@ export class NightfallServer extends EventEmitter {
   }
 
   // ---------------------------------------------------------------------------
-  // Ollama lifecycle
+  // Provider lifecycle
   // ---------------------------------------------------------------------------
 
-  private startOllamaLifecycle(): void {
-    ensureOllama(this.config, (event: OllamaLifecycleEvent) => {
+  private startProviderLifecycle(): void {
+    const onEvent = (event: ProviderLifecycleEvent) => {
       this.broadcaster.broadcast({ type: 'LIFECYCLE', payload: event });
-    }).catch((err: unknown) => {
+    };
+
+    const lifecyclePromise =
+      this.config.provider.name === 'openrouter'
+        ? ensureOpenRouter(this.config, onEvent)
+        : ensureOllama(this.config, onEvent);
+
+    lifecyclePromise.catch((err: unknown) => {
       const message = err instanceof Error ? err.message : String(err);
       this.broadcaster.broadcast({ type: 'LIFECYCLE', payload: { type: 'fatal', message } });
     });

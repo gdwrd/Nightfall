@@ -1,16 +1,7 @@
 import { spawn, execFileSync } from 'node:child_process';
-import type { NightfallConfig } from '@nightfall/shared';
+import type { NightfallConfig, ProviderLifecycleEvent } from '@nightfall/shared';
 
-export type OllamaLifecycleEvent =
-  | { type: 'detecting' }
-  | { type: 'starting' }
-  | { type: 'ready' }
-  | { type: 'checking_model'; model: string }
-  | { type: 'pulling_model'; model: string; progress: number }
-  | { type: 'model_ready'; model: string }
-  | { type: 'fatal'; message: string };
-
-export type LifecycleEventHandler = (event: OllamaLifecycleEvent) => void;
+export type LifecycleEventHandler = (event: ProviderLifecycleEvent) => void;
 
 /**
  * Check whether the `ollama` binary is installed on the system.
@@ -144,6 +135,9 @@ export async function ensureOllama(
   config: NightfallConfig,
   onEvent: LifecycleEventHandler,
 ): Promise<void> {
+  if (config.provider.name !== 'ollama') {
+    throw new Error('ensureOllama requires provider.name === "ollama"');
+  }
   const { host, port, model } = config.provider;
 
   onEvent({ type: 'detecting' });

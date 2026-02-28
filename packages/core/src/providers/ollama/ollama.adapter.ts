@@ -1,15 +1,23 @@
 import { Ollama } from 'ollama';
-import type { NightfallConfig, ProviderAdapter, ChatMessage } from '@nightfall/shared';
+import type {
+  NightfallConfig,
+  ProviderAdapter,
+  ChatMessage,
+  OllamaProviderConfig,
+} from '@nightfall/shared';
 import { isOllamaRunning, isModelAvailable, pullModel } from '../../ollama/ollama.lifecycle.js';
 
 export class OllamaAdapter implements ProviderAdapter {
   private readonly client: Ollama;
-  private readonly config: NightfallConfig;
+  private readonly providerConfig: OllamaProviderConfig;
 
   constructor(config: NightfallConfig) {
-    this.config = config;
+    if (config.provider.name !== 'ollama') {
+      throw new Error('OllamaAdapter requires provider.name === "ollama"');
+    }
+    this.providerConfig = config.provider;
     this.client = new Ollama({
-      host: `http://${config.provider.host}:${config.provider.port}`,
+      host: `http://${this.providerConfig.host}:${this.providerConfig.port}`,
     });
   }
 
@@ -19,7 +27,7 @@ export class OllamaAdapter implements ProviderAdapter {
     }
 
     const stream = await this.client.chat({
-      model: this.config.provider.model,
+      model: this.providerConfig.model,
       messages: messages.map((m) => ({ role: m.role, content: m.content })),
       stream: true,
     });
@@ -49,11 +57,11 @@ export class OllamaAdapter implements ProviderAdapter {
   }
 
   async isAvailable(): Promise<boolean> {
-    return isOllamaRunning(this.config.provider.host, this.config.provider.port);
+    return isOllamaRunning(this.providerConfig.host, this.providerConfig.port);
   }
 
   async ensureModelReady(model: string): Promise<void> {
-    const { host, port } = this.config.provider;
+    const { host, port } = this.providerConfig;
     const available = await isModelAvailable(host, port, model);
     if (!available) {
       await pullModel(host, port, model, () => {});

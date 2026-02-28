@@ -107,10 +107,14 @@ async function runInit(ctx: SlashCommandContext): Promise<string> {
 
 function formatStatus(ctx: SlashCommandContext): string {
   const { config, projectRoot } = ctx;
+  const providerLine =
+    config.provider.name === 'ollama'
+      ? `Host:    ${config.provider.host}:${config.provider.port}`
+      : `Provider: OpenRouter (cloud)`;
   const lines = [
     `Project: ${projectRoot}`,
     `Model:   ${config.provider.model}`,
-    `Host:    ${config.provider.host}:${config.provider.port}`,
+    providerLine,
     `Locks:   ${ctx.orchestrator.getLocks().length} held`,
     `Engineers (max): ${config.concurrency.max_engineers}`,
     `Rework cycles (max): ${config.task.max_rework_cycles}`,

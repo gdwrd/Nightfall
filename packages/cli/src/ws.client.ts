@@ -3,7 +3,7 @@ import { WebSocket } from 'ws';
 import type {
   ClientMessage,
   ServerMessage,
-  OllamaLifecycleEvent,
+  ProviderLifecycleEvent,
   TaskRun,
   TaskPlan,
   AgentState,
@@ -22,7 +22,7 @@ export interface IOrchestrator extends EventEmitter {
   on(event: 'task:status', listener: (run: TaskRun) => void): this;
   on(event: 'agent:state', listener: (state: AgentState) => void): this;
   on(event: 'lock:update', listener: (locks: FileLock[]) => void): this;
-  on(event: 'lifecycle', listener: (event: OllamaLifecycleEvent) => void): this;
+  on(event: 'lifecycle', listener: (event: ProviderLifecycleEvent) => void): this;
   on(
     event: 'slash:result',
     listener: (payload: { command: string; output: string }) => void,
@@ -32,7 +32,7 @@ export interface IOrchestrator extends EventEmitter {
   off(event: 'task:status', listener: (run: TaskRun) => void): this;
   off(event: 'agent:state', listener: (state: AgentState) => void): this;
   off(event: 'lock:update', listener: (locks: FileLock[]) => void): this;
-  off(event: 'lifecycle', listener: (event: OllamaLifecycleEvent) => void): this;
+  off(event: 'lifecycle', listener: (event: ProviderLifecycleEvent) => void): this;
   off(
     event: 'slash:result',
     listener: (payload: { command: string; output: string }) => void,
@@ -191,7 +191,7 @@ export class NightfallWsClient extends EventEmitter implements IOrchestrator {
   private handleServerMessage(msg: ServerMessage): void {
     switch (msg.type) {
       case 'LIFECYCLE':
-        this.emit('lifecycle', msg.payload as OllamaLifecycleEvent);
+        this.emit('lifecycle', msg.payload as ProviderLifecycleEvent);
         break;
 
       case 'TASK_STATE':

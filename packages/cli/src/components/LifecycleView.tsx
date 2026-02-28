@@ -1,20 +1,20 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import type { OllamaLifecycleEvent } from '@nightfall/core';
+import type { ProviderLifecycleEvent } from '@nightfall/shared';
 import { THEME } from '../theme.js';
 
 interface LifecycleViewProps {
-  event: OllamaLifecycleEvent;
+  event: ProviderLifecycleEvent;
 }
 
-function formatEvent(event: OllamaLifecycleEvent): { label: string; color: string } {
+function formatEvent(event: ProviderLifecycleEvent): { label: string; color: string } {
   switch (event.type) {
     case 'detecting':
-      return { label: 'Detecting Ollama...', color: THEME.dim };
+      return { label: 'Detecting provider...', color: THEME.dim };
     case 'starting':
-      return { label: 'Starting Ollama service...', color: THEME.primary };
+      return { label: 'Starting local provider...', color: THEME.primary };
     case 'ready':
-      return { label: 'Ollama is running', color: THEME.success };
+      return { label: 'Provider is running', color: THEME.success };
     case 'checking_model':
       return { label: `Checking model: ${event.model}`, color: THEME.dim };
     case 'pulling_model':
@@ -24,6 +24,10 @@ function formatEvent(event: OllamaLifecycleEvent): { label: string; color: strin
       };
     case 'model_ready':
       return { label: `Model ready: ${event.model}`, color: THEME.success };
+    case 'validating_api_key':
+      return { label: 'Validating API key...', color: THEME.dim };
+    case 'api_key_valid':
+      return { label: 'API key validated', color: THEME.success };
     case 'fatal':
       return { label: `Fatal: ${event.message}`, color: THEME.error };
   }

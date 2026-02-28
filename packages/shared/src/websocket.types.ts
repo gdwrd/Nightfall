@@ -2,16 +2,24 @@ import type { AgentState } from './agent.types.js';
 import type { TaskRun, TaskPlan, TaskStatus } from './task.types.js';
 import type { FileLock } from './lock.types.js';
 
-// ---- Ollama lifecycle events (also emitted over WS) ----
+// ---- Provider lifecycle events (emitted over WS) ----
 
-export type OllamaLifecycleEvent =
+export type ProviderLifecycleEvent =
+  // Common events (all providers)
   | { type: 'detecting' }
-  | { type: 'starting' }
   | { type: 'ready' }
   | { type: 'checking_model'; model: string }
-  | { type: 'pulling_model'; model: string; progress: number }
   | { type: 'model_ready'; model: string }
-  | { type: 'fatal'; message: string };
+  | { type: 'fatal'; message: string }
+  // Ollama-specific events
+  | { type: 'starting' }
+  | { type: 'pulling_model'; model: string; progress: number }
+  // OpenRouter-specific events
+  | { type: 'validating_api_key' }
+  | { type: 'api_key_valid' };
+
+/** @deprecated Use ProviderLifecycleEvent instead */
+export type OllamaLifecycleEvent = ProviderLifecycleEvent;
 
 // ---- Client → Server messages ----
 
@@ -25,7 +33,7 @@ export type ClientMessage =
 // ---- Server → Client messages ----
 
 export type ServerMessage =
-  | { type: 'LIFECYCLE'; payload: OllamaLifecycleEvent }
+  | { type: 'LIFECYCLE'; payload: ProviderLifecycleEvent }
   | { type: 'TASK_STATE'; payload: TaskRun }
   | { type: 'PLAN_READY'; payload: TaskPlan }
   | { type: 'AGENT_UPDATE'; payload: AgentState }

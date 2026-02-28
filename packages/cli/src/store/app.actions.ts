@@ -3,7 +3,7 @@ import type {
   TaskPlan,
   AgentState,
   FileLock,
-  OllamaLifecycleEvent,
+  ProviderLifecycleEvent,
   SnapshotMeta,
 } from '@nightfall/shared';
 import type { AppPhase } from './app.store.js';
@@ -13,7 +13,7 @@ import type { AppPhase } from './app.store.js';
 // ---------------------------------------------------------------------------
 
 export type AppAction =
-  | { type: 'LIFECYCLE_EVENT'; event: OllamaLifecycleEvent }
+  | { type: 'LIFECYCLE_EVENT'; event: ProviderLifecycleEvent }
   | { type: 'TASK_STATUS'; run: TaskRun }
   | { type: 'AGENT_STATE'; state: AgentState }
   | { type: 'LOCK_UPDATE'; locks: FileLock[] }
