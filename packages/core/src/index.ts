@@ -54,3 +54,6 @@ export {
   MEMORY_MANAGER_PROMPT,
 } from './orchestrator/agent.factory.js';
 export type { AgentFactoryOptions } from './orchestrator/agent.factory.js';
+// Phase 12 — WebSocket Server
+export { NightfallServer } from './server/websocket.server.js';
+export type { NightfallServerOptions } from './server/websocket.server.js';
