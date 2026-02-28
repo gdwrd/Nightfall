@@ -57,7 +57,7 @@ export class WsBroadcaster {
     orchestrator.on('task:status', (run: TaskRun) => {
       if (run.status === 'awaiting_approval') {
         pendingApprovalTaskId = run.id;
-      } else if (run.status !== 'planning') {
+      } else if (run.status !== 'planning' && run.status !== 'classifying') {
         pendingApprovalTaskId = null;
       }
 
@@ -70,14 +70,17 @@ export class WsBroadcaster {
       if (
         run.status === 'completed' ||
         run.status === 'rework_limit_reached' ||
-        run.status === 'cancelled'
+        run.status === 'cancelled' ||
+        run.status === 'answered'
       ) {
         const summary =
           run.status === 'completed'
             ? 'Task completed successfully.'
             : run.status === 'rework_limit_reached'
               ? 'Rework limit reached. Review changes manually.'
-              : 'Task cancelled.';
+              : run.status === 'answered'
+                ? run.answer ?? 'Question answered.'
+                : 'Task cancelled.';
         this.broadcast({ type: 'TASK_COMPLETE', payload: { status: run.status, summary } });
       }
     });

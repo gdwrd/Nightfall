@@ -1,11 +1,14 @@
 import type { AgentState } from './agent.types.js';
 
 export type TaskStatus =
+  | 'classifying'
   | 'planning'
   | 'awaiting_approval'
   | 'running'
   | 'reviewing'
   | 'reworking'
+  | 'answering'
+  | 'answered'
   | 'completed'
   | 'rework_limit_reached'
   | 'cancelled';
@@ -38,4 +41,6 @@ export interface TaskRun {
   startedAt: number;
   completedAt: number | null;
   snapshotId: string | null;
+  requestType: 'coding_task' | 'question' | null;
+  answer: string | null;
 }

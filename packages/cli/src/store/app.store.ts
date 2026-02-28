@@ -9,10 +9,12 @@ import type { AppAction } from './app.actions.js';
 export type AppPhase =
   | 'lifecycle' // Provider startup in progress
   | 'idle' // Ready for user input
+  | 'classifying' // Classifier agent running
   | 'planning' // Team Lead drafting the plan
   | 'awaiting_approval' // Plan ready, waiting for y/n/e
   | 'editing_plan' // External editor open for plan editing
   | 'running' // Engineers / reviewer executing
+  | 'answered' // Question answered
   | 'completed' // Task finished
   | 'error' // Fatal error
   | 'history_view' // Browsing task history
@@ -77,6 +79,9 @@ function reducer(state: AppState, action: AppAction): AppState {
       let phase: AppPhase = state.phase;
 
       switch (run.status) {
+        case 'classifying':
+          phase = 'classifying';
+          break;
         case 'planning':
           phase = 'planning';
           break;
@@ -86,7 +91,12 @@ function reducer(state: AppState, action: AppAction): AppState {
         case 'running':
         case 'reviewing':
         case 'reworking':
+        case 'answering':
           phase = 'running';
+          break;
+        case 'answered':
+          phase = 'answered';
+          messages.push(run.answer ?? 'Question answered.');
           break;
         case 'completed':
           phase = 'completed';
