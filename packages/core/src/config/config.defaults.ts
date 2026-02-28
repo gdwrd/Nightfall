@@ -1,4 +1,4 @@
-import type { NightfallConfig } from '@nightfall/shared'
+import type { NightfallConfig } from '@nightfall/shared';
 
 export const DEFAULT_CONFIG: NightfallConfig = {
   provider: {
@@ -16,4 +16,4 @@ export const DEFAULT_CONFIG: NightfallConfig = {
   logs: {
     retention: 50,
   },
-}
+};

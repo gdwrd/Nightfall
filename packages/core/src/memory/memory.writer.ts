@@ -1,10 +1,10 @@
-import fs from 'node:fs/promises'
-import path from 'node:path'
+import fs from 'node:fs/promises';
+import path from 'node:path';
 
-const MEMORY_DIR = '.nightfall/memory'
+const MEMORY_DIR = '.nightfall/memory';
 
 function resolveMemoryPath(projectRoot: string, relativePath: string): string {
-  return path.join(projectRoot, MEMORY_DIR, relativePath)
+  return path.join(projectRoot, MEMORY_DIR, relativePath);
 }
 
 /**
@@ -15,9 +15,9 @@ export async function writeMemoryFile(
   relativePath: string,
   content: string,
 ): Promise<void> {
-  const filePath = resolveMemoryPath(projectRoot, relativePath)
-  await fs.mkdir(path.dirname(filePath), { recursive: true })
-  await fs.writeFile(filePath, content, 'utf8')
+  const filePath = resolveMemoryPath(projectRoot, relativePath);
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, content, 'utf8');
 }
 
 /**
@@ -27,11 +27,11 @@ export async function readMemoryFile(
   projectRoot: string,
   relativePath: string,
 ): Promise<string | null> {
-  const filePath = resolveMemoryPath(projectRoot, relativePath)
+  const filePath = resolveMemoryPath(projectRoot, relativePath);
   try {
-    return await fs.readFile(filePath, 'utf8')
+    return await fs.readFile(filePath, 'utf8');
   } catch {
-    return null
+    return null;
   }
 }
 
@@ -44,12 +44,12 @@ export async function appendToMemoryFile(
   relativePath: string,
   entry: string,
 ): Promise<void> {
-  const filePath = resolveMemoryPath(projectRoot, relativePath)
-  await fs.mkdir(path.dirname(filePath), { recursive: true })
+  const filePath = resolveMemoryPath(projectRoot, relativePath);
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
 
-  const existing = await readMemoryFile(projectRoot, relativePath)
-  const content = existing ? existing.trimEnd() + '\n' + entry + '\n' : entry + '\n'
-  await fs.writeFile(filePath, content, 'utf8')
+  const existing = await readMemoryFile(projectRoot, relativePath);
+  const content = existing ? existing.trimEnd() + '\n' + entry + '\n' : entry + '\n';
+  await fs.writeFile(filePath, content, 'utf8');
 }
 
 /**
@@ -61,13 +61,13 @@ export async function updateMemoryFile(
   relativePath: string,
   newContent: string,
 ): Promise<void> {
-  await writeMemoryFile(projectRoot, relativePath, newContent)
+  await writeMemoryFile(projectRoot, relativePath, newContent);
 }
 
 /**
  * Ensure the full memory bank directory structure exists.
  */
 export async function ensureMemoryStructure(projectRoot: string): Promise<void> {
-  const memoryRoot = path.join(projectRoot, MEMORY_DIR)
-  await fs.mkdir(path.join(memoryRoot, 'components'), { recursive: true })
+  const memoryRoot = path.join(projectRoot, MEMORY_DIR);
+  await fs.mkdir(path.join(memoryRoot, 'components'), { recursive: true });
 }
