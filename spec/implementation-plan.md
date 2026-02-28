@@ -24,14 +24,14 @@
 | 5 | Memory Bank | `core` | 2, 3 | ✅ Done |
 | 6 | File Lock Registry | `core` | 2 | ✅ Done |
 | 7 | Snapshot & Rollback | `core` | 2, 3 | ✅ Done |
-| 8 | Agent Tool System | `core` | 4, 5, 6, 7 | 🚧 In Progress |
-| 9 | Agent Prompts | `core` | 8 |
-| 10 | Agent Runner | `core` | 4, 8, 9 |
-| 11 | Task Orchestrator | `core` | 6, 7, 10 |
-| 12 | Task Logger | `core` | 2, 11 |
-| 13 | WebSocket Server & Protocol | `core` | 11, 12 |
-| 14 | CLI Foundation & Layout | `cli` | 2, 13 |
-| 15 | Agent Panel UI | `cli` | 14 |
+| 8 | Agent Tool System | `core` | 4, 5, 6, 7 | ✅ Done |
+| 9 | Agent Prompts & Protocol | `core` | 8 | ✅ Done |
+| 10 | Agent Runner | `core` | 4, 8, 9 | ✅ Done |
+| 11 | Task Orchestrator | `core` | 6, 7, 10 | ✅ Done |
+| 12 | Task Logger | `core` | 2, 11 | ✅ Done |
+| 13 | WebSocket Server & Protocol | `core` | 11, 12 | ✅ Done |
+| 14 | CLI Foundation & Layout | `cli` | 2, 13 | ✅ Done |
+| 15 | Agent Panel UI | `cli` | 14 | ✅ Done |
 | 16 | Slash Commands | `cli` | 14, 15 |
 | 17 | `/init` Flow | `cli` + `core` | 5, 15, 16 |
 | 18 | `/history` & Rollback UI | `cli` + `core` | 7, 15, 16 |
@@ -188,10 +188,11 @@ export type TaskStatus = 'planning' | 'awaiting_approval' | 'running' |
 
 export interface Subtask {
   id: string
-  description: string
+  description: string           // includes successCriteria and constraints embedded by orchestrator
   assignedTo: string | null     // agent ID
   status: 'pending' | 'in_progress' | 'done' | 'failed'
   filesTouched: string[]
+  dependsOn?: string[]          // subtask IDs that must reach 'done' before this one can start
 }
 
 export interface TaskPlan {
@@ -633,143 +634,161 @@ const ROLE_TOOLS: Record<AgentRole, string[]> = {
 
 ---
 
-## Phase 9 — Agent Prompts
+## Phase 9 — Agent Prompts & Protocol
 
-**Goal:** Write the default system prompts for all four agent roles and implement the prompt loader that merges custom overrides.
+**Goal:** Write the default system prompts for all four agent roles, define the typed done signal protocol, and implement the prompt composition layer.
 
-### Files to Create
+**Status: ✅ Done** — implemented as `agent.factory.ts` (role prompts) and `agent.prompts.ts` (protocol + composition).
+
+### Files
 
 ```
-packages/core/src/agents/prompts/
-├── prompt.loader.ts            # Loads custom .nightfall/.agents/ overrides
-├── team-lead.prompt.ts
-├── engineer.prompt.ts
-├── reviewer.prompt.ts
-└── memory-manager.prompt.ts
+packages/core/src/agents/
+├── agent.prompts.ts            # buildSystemPrompt, buildToolsDescription, TOOL_INSTRUCTIONS
+└── agent.parser.ts             # parseToolCall, parseDone (two-format support)
+
+packages/core/src/orchestrator/
+└── agent.factory.ts            # TEAM_LEAD_PROMPT, ENGINEER_PROMPT, REVIEWER_PROMPT,
+                                # MEMORY_MANAGER_PROMPT + factory functions
 ```
 
-### Key Implementation Details
+Custom prompt overrides loaded from `.nightfall/.agents/<role>.md` at runtime in `buildFactoryOptions()`.
 
-**Prompt design principles:**
-- Each prompt is a TypeScript template literal, not a static string, so dynamic values (model, max_engineers, etc.) can be injected at runtime
-- Prompts emphasize compact, JSON-structured responses to minimize tokens
-- Tool use is described in-prompt with exact JSON schemas — no reliance on model-side function calling
+### Done Signal Protocol
 
-**`team-lead.prompt.ts`** — core instructions:
-- You are the Team Lead. Analyze the task and the memory bank.
-- First response MUST be a JSON plan: `{ subtasks: [...], complexity: 'simple'|'complex', estimatedEngineers: N }`
-- After user approval, use `assign_task` to dispatch each subtask
-- After review: respond with JSON `{ decision: 'done' | 'rework', reworkInstructions?: Record<subtaskId, string> }`
+All agents emit a `<done>` block containing JSON. `parseDone` supports two formats:
+- **Legacy:** `{"summary": "..."}` — unwraps the string value (backward compat for Memory Manager)
+- **Structured:** any other JSON object — passes raw JSON through unchanged so the orchestrator can parse it with role-specific logic (no double-encoding)
 
-**`engineer.prompt.ts`** — core instructions:
-- You are Engineer `{id}`. Your only task is: `{subtask.description}`
-- Use `read_memory` first (index only), then `read_file` for specific files you need
-- Use `write_diff` to apply changes — produce the smallest valid unified diff
-- Respond with JSON when done: `{ status: 'done', filesChanged: [...], summary: '...' }`
+The `TOOL_INSTRUCTIONS` appended to every system prompt does NOT specify a schema — each role prompt defines its own schema explicitly, preventing override conflicts.
 
-**`reviewer.prompt.ts`** — core instructions:
-- You are the Reviewer. Compare the changed files against the original task goal.
-- Use `run_command` to execute the project's test/build command
-- Respond with JSON: `{ verdict: 'pass' | 'fail', issues?: [{ subtaskId, description }] }`
+### Team Lead Prompt Design
 
-**`memory-manager.prompt.ts`** — core instructions:
-- You are the Memory Manager. Update the memory bank to reflect the completed task.
-- Load `index.md`, then each component file relevant to touched files
-- Use `write_memory` and `update_index` to persist changes
-- Keep all files compact — summarize, never append verbatim logs
+**Two explicit phases — never mixed:**
+- Phase 1 (Gather): read memory index → load relevant component files → read source files. No planning.
+- Phase 2 (Plan): produce minimum subtasks, each with exactly one job.
 
-**`prompt.loader.ts`**:
-```typescript
-async function loadPrompt(role: AgentRole, projectRoot: string): Promise<string> {
-  const customPath = path.join(projectRoot, '.nightfall', '.agents', `${role}.md`)
-  if (await fileExists(customPath)) {
-    return fs.readFile(customPath, 'utf-8')
-  }
-  return getDefaultPrompt(role)
+**Done signal schema:**
+```json
+{
+  "subtasks": [{
+    "id": "subtask-1",
+    "description": "Full implementation instructions",
+    "files": ["src/foo.ts"],
+    "successCriteria": ["tests pass for X", "function Y returns Z"],
+    "constraints": ["do not modify files outside listed scope"],
+    "dependsOn": []
+  }],
+  "complexity": "simple | complex",
+  "estimatedEngineers": N
+}
+```
+`successCriteria` and `constraints` are embedded into the engineer's task description string by `buildSubtaskDescription()` in the orchestrator — engineers cannot miss them.
+
+### Engineer Prompt Design
+
+**Handoff contract:** Engineers are told they receive a subtask with description, files, success criteria, and constraints. If the subtask is ambiguous or files are missing, they must signal `confidence: "blocked"` immediately — never guess.
+
+**Done signal schema:**
+```json
+{
+  "filesChanged": ["src/foo.ts"],
+  "testsRun": ["npm test -- --testPathPattern=foo"],
+  "testsPassed": true,
+  "confidence": "high | medium | low | blocked",
+  "concerns": ["optional notes about edge cases or risks"]
 }
 ```
 
+### Reviewer Prompt Design
+
+**Assume-breach posture:** Every engineer claim is treated as unverified. Tests must be independently re-run regardless of what the engineer reported. If an engineer done signal is missing `filesChanged` or has `confidence: "blocked"`, the reviewer must fail the review with a specific issue entry.
+
+**Done signal schema:**
+```json
+{
+  "passed": true,
+  "filesReviewed": ["src/foo.ts"],
+  "commandsRun": ["npm test", "npm run lint"],
+  "issues": [{ "description": "what is wrong", "evidence": "test output line or file:lineNumber" }],
+  "notes": "overall summary"
+}
+```
+`issues` must be `[]` when `passed` is `true`.
+
+### Memory Manager Prompt Design
+
+**Quality guard:** Only promote patterns from work the Reviewer explicitly passed. Patterns from rejected rework cycles must not be persisted. If a pattern was introduced to fix a rework issue, note it as a workaround in `progress.md`.
+
+**Input contract:** Receives task prompt + structured engineer results + reviewer verdict. Uses these as primary source — does not re-infer what changed.
+
 ### Acceptance Criteria
-- Custom override file is used when present, default when absent
-- Prompts compile without TypeScript errors
-- Each prompt includes explicit JSON output schemas for all expected responses
+- Custom override file is used when present, built-in default when absent
+- `parseDone` correctly handles legacy `{"summary":"..."}` and structured role-specific JSON
+- Each role prompt includes explicit JSON output schemas with no conflicts with TOOL_INSTRUCTIONS
+- `buildSubtaskDescription` embeds successCriteria and constraints into the description string
 
 ---
 
 ## Phase 10 — Agent Runner
 
-**Goal:** Implement the agent execution loop — send prompts, parse tool calls from model output, execute tools, feed results back, repeat until the agent signals completion.
+**Goal:** Implement the agent execution loop — send prompts, parse tool calls from model output, execute tools, feed results back, repeat until the agent signals completion or exhausts its budget.
 
-### Files to Create
+**Status: ✅ Done** — implemented as `BaseAgent` in `agent.base.ts`.
+
+### Files
 
 ```
 packages/core/src/agents/
-├── agent.runner.ts
-├── agent.runner.test.ts
-└── agent.context.ts            # Per-agent context accumulator
+├── agent.base.ts               # BaseAgent class — shared loop for all 4 roles
+└── agent.parser.ts             # parseToolCall, parseDone
 ```
 
 ### Key Implementation Details
 
-**`agent.context.ts`** — manages the conversation history for a single agent within a single task:
+**`BaseAgent`** — extends `EventEmitter`, shared by all four roles:
 ```typescript
-class AgentContext {
-  private messages: Message[] = []
-
-  addSystem(content: string): void
-  addUser(content: string): void
-  addAssistant(content: string): void
-  addToolResult(tool: string, result: string): void
-  getMessages(): Message[]
-  reset(): void   // called between tasks — fresh context per task
+class BaseAgent extends EventEmitter {
+  async run(options: AgentRunOptions): Promise<AgentRunResult>
 }
-```
 
-**`agent.runner.ts`** — the core ReAct loop:
-```typescript
-class AgentRunner {
-  constructor(
-    private role: AgentRole,
-    private agentId: string,
-    private provider: ProviderAdapter,
-    private toolRegistry: ToolRegistry,
-    private memoryManager: MemoryManager,
-    private onStateChange: (state: AgentState) => void,
-    private signal: AbortSignal,
-  ) {}
-
-  async run(systemPrompt: string, initialUserMessage: string): Promise<AgentRunResult>
+interface AgentRunOptions {
+  task: string         // initial user message
+  signal?: AbortSignal
 }
-```
 
-**Loop logic:**
-1. `context.addSystem(systemPrompt)`, `context.addUser(initialUserMessage)`
-2. Call `provider.complete()` with all messages, stream tokens
-3. Accumulate streamed tokens, emit each chunk via `onStateChange` for live UI
-4. When stream ends, attempt to parse JSON from the full response
-5. If response contains `tool_calls` key: execute each tool via registry, add results to context, `goto 2`
-6. If response contains a `done` signal or no tool calls: return `AgentRunResult`
-7. If `AbortSignal` fires at any step: throw `AgentAbortedError`
-
-**`AgentRunResult`:**
-```typescript
 interface AgentRunResult {
-  agentId: string
-  role: AgentRole
-  finalResponse: string
-  toolCallTrace: Array<{ call: ToolCall; result: ToolResult }>
-  filesChanged: string[]
-  aborted: boolean
+  summary: string      // content of the <done> block (role-specific JSON or plain text)
+  log: AgentLogEntry[] // full action trace: thoughts, tool calls, tool results
+  interrupted?: boolean // true if the agent exhausted maxIterations without a done signal
 }
 ```
 
-**Max turns guard:** If the loop runs more than 20 turns without a terminal signal, the agent is forced to a `done` state with a warning.
+**Loop logic (ReAct pattern):**
+1. Build system prompt: `buildSystemPrompt(rolePrompt, toolDefs)` → role prompt + tool descriptions + TOOL_INSTRUCTIONS
+2. Initialize conversation: `[system, user(task)]`
+3. Call `provider.complete(messages, signal)` — stream tokens
+4. Accumulate full response, emit `state` event for live UI
+5. Parse response: try `parseToolCall` first, then `parseDone`
+   - **Tool call found:** execute via `toolRegistry.execute()`, append exchange to messages, loop
+   - **Done signal found:** return `{ summary: done.summary, log }`
+   - **Neither:** treat full response as final answer, return
+6. If `AbortSignal` fires: return `{ summary: 'Cancelled', log }`
+7. If loop reaches `maxIterations`: return `{ summary: '...limit...', log, interrupted: true }`
+
+**`interrupted` flag:** When `interrupted` is `true`, the orchestrator treats the agent's result as a failed/blocked subtask — it does NOT proceed to review as if the work were complete. Engineers: 30 max iterations. Other roles: 20.
+
+**State events:** `BaseAgent` emits `'state'` (full `AgentState` snapshot) on every thought, tool call, and tool result. The orchestrator forwards these to the WebSocket server for live UI updates.
+
+**`parseDone` — two-format support:**
+- `{"summary": "string"}` (single field, legacy) → unwraps and returns the string
+- Any other JSON object → returns raw JSON string for orchestrator to parse role-specifically
 
 ### Acceptance Criteria
-- Agent correctly parses and executes a multi-step tool call sequence
-- `AbortSignal` cancels the loop mid-stream and returns an aborted result
-- `onStateChange` is called with each streamed token chunk
-- Max turns guard triggers at 20 and emits a warning in the run result
+- Agent correctly executes a multi-step tool call sequence and terminates on `<done>`
+- `AbortSignal` cancels mid-stream without unhandled rejections
+- `interrupted: true` is returned when `maxIterations` is exhausted
+- `state` events fire on every action for live UI streaming
 
 ---
 
@@ -777,82 +796,90 @@ interface AgentRunResult {
 
 **Goal:** Wire all core systems together into the full task lifecycle: plan → approve → snapshot → dispatch → review → decision → memory update.
 
-### Files to Create
+**Status: ✅ Done** — implemented as `task.orchestrator.ts`.
+
+### Files
 
 ```
 packages/core/src/orchestrator/
-├── task.orchestrator.ts        # Main state machine
-├── task.orchestrator.test.ts
-└── concurrency.manager.ts      # Controls parallel engineer dispatch
+├── task.orchestrator.ts        # Full lifecycle state machine + scheduling
+└── agent.factory.ts            # Creates BaseAgent instances for each role
 ```
 
 ### Key Implementation Details
 
-**`task.orchestrator.ts`** — event-driven state machine:
-
+**`TaskOrchestrator`** — `EventEmitter` with public API:
 ```typescript
-type OrchestratorEvent =
-  | { type: 'TASK_SUBMITTED'; prompt: string }
-  | { type: 'PLAN_APPROVED'; editedPlan?: TaskPlan }
-  | { type: 'PLAN_REJECTED' }
-  | { type: 'INTERRUPT' }
-
 class TaskOrchestrator extends EventEmitter {
-  constructor(
-    private config: NightfallConfig,
-    private provider: ProviderAdapter,
-    private memoryManager: MemoryManager,
-    private lockRegistry: LockRegistry,
-    private snapshotManager: SnapshotManager,
-    private logger: TaskLogger,
-  ) {}
+  async submitTask(prompt: string, signal?: AbortSignal): Promise<TaskRun>
+  async approvePlan(taskId: string, signal?: AbortSignal): Promise<TaskRun>
+  getTaskRun(taskId: string): TaskRun | undefined
 
-  async submitTask(prompt: string): Promise<void>
-  async approvePlan(editedPlan?: TaskPlan): Promise<void>
-  async rejectPlan(): Promise<void>
-  async interrupt(): Promise<void>
-
-  // Events emitted:
-  // 'state_change'   — full TaskRun state update (consumed by WS server)
-  // 'plan_ready'     — Team Lead produced a plan, waiting for user approval
-  // 'task_complete'  — task finished (completed | rework_limit | cancelled)
-  // 'agent_update'   — individual agent state changed
+  // Events: 'task:plan-ready', 'task:status', 'agent:state', 'lock:update'
 }
 ```
 
-**State machine transitions:**
-
+**State transitions:**
 ```
-IDLE
-  → TASK_SUBMITTED → PLANNING (Team Lead runs)
-  → PLANNING → AWAITING_APPROVAL (plan ready event)
-  → AWAITING_APPROVAL → RUNNING (plan approved)
-  → AWAITING_APPROVAL → IDLE (plan rejected)
-  → RUNNING → REVIEWING (all engineers done)
-  → REVIEWING → COMPLETE (reviewer passes)
-  → REVIEWING → REWORKING (reviewer fails, cycles < max)
-  → REWORKING → REVIEWING (rework engineers done)
-  → REVIEWING → ESCALATED (cycles >= max)
-  → any state → CANCELLED (INTERRUPT received)
+planning → awaiting_approval → running → reviewing → completed
+                                       ↓          ↓
+                                    reworking ← failed (rework loop, max 3 cycles)
+                                                  ↓
+                                        rework_limit_reached
+  any → cancelled (AbortSignal)
 ```
 
-**`concurrency.manager.ts`**:
-- Receives a list of subtasks and `max_engineers` from config
-- Dispatches subtasks in batches: first batch fills `max_engineers` slots
-- As each engineer finishes, the next pending subtask is dispatched
-- Returns `Promise<AgentRunResult[]>` when all subtasks complete
+**`runEngineers` — dependency-aware topological scheduling:**
+- Builds waves: each iteration finds all subtasks with `status === 'pending'` whose `dependsOn` entries are all `'done'`
+- Runs each wave in parallel, batched by `max_engineers`
+- A subtask blocked by a failed dependency never becomes ready — the wave loop exits
+- Detects interrupted engineers: `result.interrupted === true` OR `confidence === "blocked"` in done signal JSON → subtask marked `'failed'`
 
-**Interrupt handling:**
-- `interrupt()` triggers an `AbortController`
-- The abort signal is passed into all running `AgentRunner` instances
-- After all runners abort, `releaseAllLocksFor` is called for each aborted agent
-- Snapshot is NOT rolled back on interrupt — user must do that manually via `/history`
+**`parsePlan` — Team Lead output processing:**
+- Parses typed JSON plan directly (no double-encoding)
+- Reads `dependsOn` per subtask
+- Calls `buildSubtaskDescription(s)` to embed `successCriteria` and `constraints` into the description string the engineer receives
+
+**`runReviewer` — structured context:**
+- Passes engineer done signals as structured JSON (not prose), prefixed per subtask
+- Interrupted engineers are flagged explicitly: `"INTERRUPTED — engineer did not complete"`
+- Review task message includes an explicit mandate: re-run all tests independently, verify every file
+
+**Rework context — structured per engineer:**
+Each engineer on a rework cycle receives:
+```
+[REWORK — cycle N]
+
+Original task:
+<original subtask description>
+
+Your previous attempt result:
+<engineer's own typed done signal from the previous cycle>
+
+Reviewer found these issues — fix ALL of them:
+- <issue 1 with evidence>
+- <issue 2 with evidence>
+```
+This ensures engineers know their own prior result and the specific failures — not just a generic re-description of all issues.
+
+**`runMemoryManager` — structured input:**
+Receives task prompt + engineer result summaries + reviewer verdict (`PASSED`) and rework cycle count. Explicitly instructs the Memory Manager to promote only patterns from the final passing implementation.
+
+**`parseReviewResult` — evidence-backed format:**
+Handles both legacy flat-string issues (`string[]`) and the new object format (`{description, evidence}[]`). Evidence is appended inline: `"<description> (evidence: <evidence>)"`.
+
+**Helper functions:**
+- `buildSubtaskDescription(s)`: embeds successCriteria and constraints into description
+- `isBlockedEngineer(summary)`: checks `confidence === "blocked"` in engineer done JSON
+- `parseReviewResult(summary)`: handles both issue formats
 
 ### Acceptance Criteria
 - Full task lifecycle runs end-to-end with mock provider
-- Rework loop increments cycle counter, escalates at max
-- Interrupt cancels all agents and releases all locks cleanly
-- State machine never enters an invalid transition
+- Topological wave scheduling: subtask with `dependsOn: ["subtask-1"]` does not start until `subtask-1` is done
+- Blocked/interrupted engineers are marked `'failed'` — not forwarded to reviewer as complete
+- Rework loop provides each engineer with its own previous attempt summary
+- Memory Manager only runs after reviewer passes
+- Interrupt (AbortSignal) cancels all agents and releases all locks cleanly
 
 ---
 

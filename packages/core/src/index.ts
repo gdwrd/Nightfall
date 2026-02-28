@@ -57,3 +57,5 @@ export type { AgentFactoryOptions } from './orchestrator/agent.factory.js';
 // Phase 12 — WebSocket Server
 export { NightfallServer } from './server/websocket.server.js';
 export type { NightfallServerOptions } from './server/websocket.server.js';
+export { WsBroadcaster } from './server/ws.broadcaster.js';
+export type { PendingApprovalHandle } from './server/ws.broadcaster.js';

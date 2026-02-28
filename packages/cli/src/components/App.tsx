@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Box, Text, useApp, useInput } from 'ink';
 import type { NightfallConfig, TaskRun, AgentState, FileLock } from '@nightfall/shared';
 import type { OllamaLifecycleEvent } from '@nightfall/shared';
@@ -12,19 +12,11 @@ import { PlanView } from './PlanView.js';
 import { InputBar } from './InputBar.js';
 import type { InputMode } from './InputBar.js';
 import { handleSlashCommand } from '../slash.commands.js';
+import { useAppStore } from '../store/app.store.js';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-type AppPhase =
-  | 'lifecycle'    // Ollama startup in progress
-  | 'idle'         // Ready for user input
-  | 'planning'     // Team Lead is drafting the plan
-  | 'awaiting_approval' // Plan ready, waiting for y/n
-  | 'running'      // Engineers / reviewer executing
-  | 'completed'    // Task finished
-  | 'error';       // Fatal error
 
 interface AppProps {
   config: NightfallConfig;
@@ -38,73 +30,30 @@ interface AppProps {
 
 export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) => {
   const { exit } = useApp();
-
-  // ── State ──────────────────────────────────────────────────────────────────
-  const [phase, setPhase] = useState<AppPhase>('lifecycle');
-  const [lifecycleEvent, setLifecycleEvent] = useState<OllamaLifecycleEvent>({ type: 'detecting' });
-  const [activeRun, setActiveRun] = useState<TaskRun | null>(null);
-  const [agentStates, setAgentStates] = useState<Record<string, AgentState>>({});
-  const [locks, setLocks] = useState<FileLock[]>([]);
-  const [messages, setMessages] = useState<string[]>([]);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [state, dispatch] = useAppStore();
+  const { phase, lifecycleEvent, activeRun, agentStates, locks, messages, errorMessage } = state;
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // ── Ollama lifecycle — received as events from the orchestrator/server ─────
+  // ── Ollama lifecycle events ─────────────────────────────────────────────────
   useEffect(() => {
     const onLifecycle = (event: OllamaLifecycleEvent) => {
-      setLifecycleEvent(event);
-      if (event.type === 'model_ready') {
-        setPhase('idle');
-      } else if (event.type === 'fatal') {
-        setErrorMessage(event.message);
-        setPhase('error');
-      }
+      dispatch({ type: 'LIFECYCLE_EVENT', event });
     };
-
     orchestrator.on('lifecycle', onLifecycle);
     return () => { orchestrator.off('lifecycle', onLifecycle); };
-  }, [orchestrator]);
+  }, [orchestrator, dispatch]);
 
   // ── Orchestrator event wiring ──────────────────────────────────────────────
   useEffect(() => {
     const onTaskStatus = (run: TaskRun) => {
-      setActiveRun(run);
-      setAgentStates({ ...run.agentStates });
-
-      switch (run.status) {
-        case 'planning':
-          setPhase('planning');
-          break;
-        case 'awaiting_approval':
-          setPhase('awaiting_approval');
-          break;
-        case 'running':
-        case 'reviewing':
-        case 'reworking':
-          setPhase('running');
-          break;
-        case 'completed':
-          setPhase('completed');
-          addMessage('✓ Task completed successfully.');
-          break;
-        case 'rework_limit_reached':
-          setPhase('completed');
-          addMessage('⚠ Rework limit reached. Review the changes manually.');
-          break;
-        case 'cancelled':
-          setPhase('idle');
-          addMessage('Task cancelled.');
-          break;
-      }
+      dispatch({ type: 'TASK_STATUS', run });
     };
-
-    const onAgentState = (state: AgentState) => {
-      setAgentStates((prev) => ({ ...prev, [state.id]: state }));
+    const onAgentState = (s: AgentState) => {
+      dispatch({ type: 'AGENT_STATE', state: s });
     };
-
     const onLockUpdate = (updated: FileLock[]) => {
-      setLocks(updated);
+      dispatch({ type: 'LOCK_UPDATE', locks: updated });
     };
 
     orchestrator.on('task:status', onTaskStatus);
@@ -116,7 +65,7 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) =
       orchestrator.off('agent:state', onAgentState);
       orchestrator.off('lock:update', onLockUpdate);
     };
-  }, [orchestrator]);
+  }, [orchestrator, dispatch]);
 
   // ── Keyboard: Ctrl+C ───────────────────────────────────────────────────────
   useInput((input, key) => {
@@ -129,13 +78,10 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) =
     }
   });
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
-  const addMessage = (msg: string) => {
-    setMessages((prev) => [...prev.slice(-9), msg]);
-  };
-
   // ── Input handler ──────────────────────────────────────────────────────────
   const handleInput = async (input: string) => {
+    const addMessage = (msg: string) => dispatch({ type: 'ADD_MESSAGE', message: msg });
+
     // Slash commands
     if (input.startsWith('/')) {
       const result = await handleSlashCommand(input, { config, orchestrator, projectRoot, addMessage });
@@ -144,7 +90,7 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) =
         return;
       }
       if (result === '[clear]') {
-        setMessages([]);
+        dispatch({ type: 'CLEAR_MESSAGES' });
         return;
       }
       if (result) addMessage(result);
@@ -159,14 +105,13 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) =
         abortControllerRef.current = ac;
         orchestrator.approvePlan(activeRun.id, ac.signal).catch((err: unknown) => {
           addMessage(`Error: ${err instanceof Error ? err.message : String(err)}`);
-          setPhase('idle');
+          dispatch({ type: 'SET_PHASE', phase: 'idle' });
         });
         return;
       }
       if (lower === 'n' || lower === 'no') {
-        setPhase('idle');
-        setActiveRun(null);
-        setAgentStates({});
+        dispatch({ type: 'SET_PHASE', phase: 'idle' });
+        dispatch({ type: 'RESET_TASK' });
         addMessage('Plan rejected. Submit a revised task.');
         return;
       }
@@ -175,13 +120,12 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) =
 
     // Submit new task
     if (phase === 'idle' || phase === 'completed' || phase === 'awaiting_approval') {
-      setAgentStates({});
-      setLocks([]);
+      dispatch({ type: 'RESET_TASK' });
       const ac = new AbortController();
       abortControllerRef.current = ac;
       orchestrator.submitTask(input, ac.signal).catch((err: unknown) => {
-        addMessage(`Error: ${err instanceof Error ? err.message : String(err)}`);
-        setPhase('idle');
+        dispatch({ type: 'ADD_MESSAGE', message: `Error: ${err instanceof Error ? err.message : String(err)}` });
+        dispatch({ type: 'SET_PHASE', phase: 'idle' });
       });
     }
   };
@@ -205,9 +149,7 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) =
   if (phase === 'error') {
     return (
       <Box flexDirection="column" padding={1}>
-        <Text bold color={THEME.error}>
-          Fatal error
-        </Text>
+        <Text bold color={THEME.error}>Fatal error</Text>
         <Text color={THEME.textDim}>{errorMessage}</Text>
       </Box>
     );

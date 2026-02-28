@@ -116,10 +116,10 @@ On every launch, Nightfall automatically:
 
 | Agent | Role | Tool Access |
 |---|---|---|
-| **Team Lead** | Receives task, plans subtasks, coordinates engineers, makes done/rework decision | `read_memory`, `read_file`, `assign_task`, `request_review` |
-| **Engineer** | Executes assigned subtask, reads files, writes diffs | `read_memory`, `read_file`, `write_diff`, `run_command` |
-| **Reviewer** | Compares completed work against original task, reports to Team Lead | `read_memory`, `read_file`, `run_command` |
-| **Memory Manager** | Maintains memory bank after task completion or on demand | `read_file`, `write_memory`, `update_index` |
+| **Team Lead** | Gathers codebase context (Phase 1), then produces a typed subtask plan with success criteria, constraints, and dependency ordering (Phase 2) | `read_memory`, `read_file`, `assign_task`, `request_review` |
+| **Engineer** | Implements exactly one assigned subtask; signals blocked if the subtask is ambiguous rather than guessing; emits a typed done signal with files changed, test results, and confidence level | `read_memory`, `read_file`, `write_diff`, `run_command` |
+| **Reviewer** | Independently re-runs all tests and linting (assume-breach posture — never trusts engineer-reported results); emits an evidence-backed verdict with per-issue file/line citations | `read_memory`, `read_file`, `run_command` |
+| **Memory Manager** | Updates memory bank only from work the Reviewer explicitly passed; guards against promoting rejected patterns from failed rework cycles | `read_file`, `write_memory`, `update_index` |
 
 ### 6.2 Custom Agent Prompts
 
@@ -140,6 +140,60 @@ If a file is present, Nightfall uses it. If not, the built-in default prompt is 
 
 At launch, one model is configured globally. All agents use the same model. Per-agent model assignment is a future enhancement.
 
+### 6.4 Agent Communication Protocol
+
+Agents communicate through typed JSON done signals rather than free-text summaries. The `<done>` block in every agent response must contain valid JSON matching the role's schema. The orchestrator parses each schema with role-specific logic — no double-encoding.
+
+**Team Lead done signal:**
+```json
+{
+  "subtasks": [
+    {
+      "id": "subtask-1",
+      "description": "Full implementation instructions",
+      "files": ["src/foo.ts"],
+      "successCriteria": ["tests pass for X", "function Y returns Z"],
+      "constraints": ["do not modify files outside listed scope"],
+      "dependsOn": []
+    }
+  ],
+  "complexity": "simple | complex",
+  "estimatedEngineers": 2
+}
+```
+`dependsOn` is an array of subtask IDs that must reach `done` before this subtask can start (empty = can run in parallel). `successCriteria` and `constraints` are embedded into the engineer's task description by the orchestrator.
+
+**Engineer done signal:**
+```json
+{
+  "filesChanged": ["src/foo.ts"],
+  "testsRun": ["npm test -- --testPathPattern=foo"],
+  "testsPassed": true,
+  "confidence": "high | medium | low | blocked",
+  "concerns": ["optional notes about edge cases or risks"]
+}
+```
+`confidence: "blocked"` means the engineer could not start because the subtask was ambiguous or referenced missing files. The orchestrator treats a blocked or interrupted engineer as a failed subtask — it does not proceed to review.
+
+**Reviewer done signal:**
+```json
+{
+  "passed": true,
+  "filesReviewed": ["src/foo.ts"],
+  "commandsRun": ["npm test", "npm run lint"],
+  "issues": [
+    { "description": "what is wrong", "evidence": "exact test output line or file:lineNumber" }
+  ],
+  "notes": "overall summary of what was verified"
+}
+```
+`issues` must be an empty array `[]` when `passed` is `true`. Every issue must cite specific evidence — not a general impression.
+
+**Memory Manager done signal:**
+```json
+{ "summary": "brief description of what memory was updated" }
+```
+
 ---
 
 ## 7. Task Lifecycle
@@ -150,10 +204,15 @@ At launch, one model is configured globally. All agents use the same model. Per-
 User submits task
        │
        ▼
-[Team Lead — Plan Mode]
-  Reads memory index → pulls relevant component files
-  Reads specific source files if needed (read_file)
-  Drafts execution plan with subtask breakdown
+[Team Lead — Phase 1: Gather Information]
+  Reads memory index → pulls all relevant component files
+  Reads specific source files (read_file) — no planning yet
+       │
+       ▼
+[Team Lead — Phase 2: Produce Plan]
+  Breaks task into minimum subtasks, each with ONE job
+  Populates successCriteria, constraints, and dependsOn per subtask
+  Outputs typed JSON plan (subtasks + complexity + estimatedEngineers)
        │
        ▼
 [User approves plan] ◄──── User can edit plan before approving
@@ -162,30 +221,40 @@ User submits task
 [Snapshot] — pre-task file states saved to .nightfall/snapshots/
        │
        ▼
-[Team Lead — Assign]
-  Splits into subtasks
-  Simple task → 1 engineer
-  Complex task → N engineers (up to max_concurrency), dispatched in parallel
+[Engineer Agents — Dependency-Aware Scheduling]
+  Orchestrator schedules subtasks in topological waves:
+    Wave 1: all subtasks with empty dependsOn run in parallel (up to max_engineers)
+    Wave 2: subtasks whose dependencies completed in wave 1, and so on
+  Each engineer:
+    Reads memory bank (index → relevant files only)
+    Reads specific source files as needed
+    Acquires file locks before editing, releases after
+    Writes changes as diffs only
+    Self-checks with run_command (informational only)
+    Signals done with typed JSON: filesChanged, testsPassed, confidence, concerns
+  Blocked engineer (confidence: "blocked") → subtask marked failed, reviewer sees it
+  Interrupted engineer (hit maxIterations) → subtask marked failed
        │
        ▼
-[Engineer Agents — Parallel Execution]
-  Each reads memory bank (index → relevant files only)
-  Reads specific source files as needed
-  Acquires file locks before editing
-  Writes changes as diffs
-  Releases locks on completion
+[Reviewer Agent — Assume-Breach Posture]
+  Receives structured engineer done signals (not prose)
+  Independently re-runs ALL tests and linting — never trusts engineer reports
+  Reads every changed file directly
+  Produces evidence-backed verdict: passed + filesReviewed + commandsRun + issues[{description,evidence}]
        │
        ▼
-[Reviewer Agent]
-  Reads changed files
-  Runs tests/build commands to verify
-  Produces structured report: ✅ done / ❌ issues found
+[Decision]
+  ✅ Passed → Memory Manager updates memory bank → task complete
+  ❌ Failed → Rework: each engineer receives its own previous attempt summary
+               + full reviewer issues list → engineers retry
+  After max_rework_cycles failures → escalate to user with full reviewer report
        │
        ▼
-[Team Lead — Decision]
-  ✅ Done → Memory Manager updates memory bank → task complete
-  ❌ Rework → sends specific engineers back with reviewer notes
-  After 3 rework cycles → escalate to user with full reviewer report
+[Memory Manager] (only on pass)
+  Receives: task prompt + engineer results + reviewer verdict (PASSED)
+  Promotes only patterns from the final passing implementation
+  Never persists patterns from rejected rework cycles
+  Updates progress.md, patterns.md, relevant component files
 ```
 
 ### 7.2 Task Interruption (Ctrl+C)
@@ -228,7 +297,8 @@ Nightfall applies multiple layers of token optimization:
 | **Memory routing** | Agents load the index first, then pull only the specific component files relevant to their subtask |
 | **AST-aware file reading** | `read_file` can target specific functions, classes, or line ranges — not always the whole file |
 | **Diff-based writes** | Engineers never rewrite whole files; they produce and apply minimal diffs |
-| **Structured inter-agent communication** | Agents communicate via compact JSON schemas, not verbose natural language |
+| **Typed done signals** | Each agent role emits a specific JSON schema in its done block; the orchestrator parses each schema directly — no free-text summaries, no double-encoding |
+| **Context isolation per agent** | Each agent receives only the data it needs: engineers get their subtask description only; the reviewer gets structured engineer done signals, not raw conversation history |
 | **Per-task context reset** | Each agent's context window is fresh per task — no accumulating chat history |
 | **Summary handoff** | Team Lead summarizes engineer outputs before passing to Reviewer |
 
