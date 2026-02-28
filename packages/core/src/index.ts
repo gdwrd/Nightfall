@@ -39,3 +39,18 @@ export { requestReviewTool, setRequestReviewBus } from './tools/tools/request_re
 export type { RequestReviewMessage } from './tools/tools/request_review.js';
 export { writeMemoryTool } from './tools/tools/write_memory.js';
 export { updateIndexTool } from './tools/tools/update_index.js';
+// Phase 10 — Task Orchestrator
+export { TaskOrchestrator } from './orchestrator/task.orchestrator.js';
+export type { OrchestratorOptions, ReviewResult } from './orchestrator/task.orchestrator.js';
+export { TaskLogger } from './orchestrator/task.logger.js';
+export {
+  createTeamLeadAgent,
+  createEngineerAgent,
+  createReviewerAgent,
+  createMemoryManagerAgent,
+  TEAM_LEAD_PROMPT,
+  ENGINEER_PROMPT,
+  REVIEWER_PROMPT,
+  MEMORY_MANAGER_PROMPT,
+} from './orchestrator/agent.factory.js';
+export type { AgentFactoryOptions } from './orchestrator/agent.factory.js';
