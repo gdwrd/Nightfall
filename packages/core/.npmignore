@@ -1,6 +1,7 @@
 src/
 tsconfig.json
 vitest.config.ts
+vitest.config.mts
 *.test.ts
 *.test.js
 .turbo/
