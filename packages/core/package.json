@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
-    "nightfall-core": "dist/index.js"
+    "nightfall-core": "dist/server/core.entrypoint.js"
   },
   "scripts": {
     "build": "tsc",
