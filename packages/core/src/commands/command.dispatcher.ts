@@ -31,13 +31,13 @@ export interface CommandDispatcherContext {
 export class CommandDispatcher {
   constructor(private readonly ctx: CommandDispatcherContext) {}
 
-  async dispatch(command: string, _args: string): Promise<string> {
+  async dispatch(command: string, args: string): Promise<string> {
     switch (command.toLowerCase()) {
       case '/help':
         return helpHandler();
 
       case '/init':
-        return initHandler(this.ctx, _args);
+        return initHandler(this.ctx, args);
 
       case '/status':
         return statusHandler(this.ctx);
@@ -46,7 +46,7 @@ export class CommandDispatcher {
         return configHandler(this.ctx);
 
       case '/history':
-        return historyHandler(this.ctx);
+        return historyHandler(this.ctx, args);
 
       case '/agents':
         return agentsHandler(this.ctx);

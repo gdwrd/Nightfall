@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Box, Text, useApp, useInput } from 'ink';
-import type { NightfallConfig, TaskRun, AgentState, FileLock } from '@nightfall/shared';
+import type { NightfallConfig, TaskRun, AgentState, FileLock, SnapshotMeta } from '@nightfall/shared';
 import type { OllamaLifecycleEvent } from '@nightfall/shared';
 import type { IOrchestrator } from '../ws.client.js';
 import { THEME } from '../theme.js';
@@ -14,6 +14,8 @@ import type { InputMode } from './InputBar.js';
 import { editPlanInEditor } from './PlanEditor.js';
 import { SlashOutput } from './SlashOutput.js';
 import { SlashAutocomplete } from './SlashAutocomplete.js';
+import { HistoryView } from './HistoryView.js';
+import { RollbackConfirm } from './RollbackConfirm.js';
 import { useAppStore } from '../store/app.store.js';
 
 // ---------------------------------------------------------------------------
@@ -33,7 +35,20 @@ interface AppProps {
 export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) => {
   const { exit } = useApp();
   const [state, dispatch] = useAppStore();
-  const { phase, lifecycleEvent, activeRun, agentStates, locks, messages, errorMessage, slashOutput } = state;
+  const {
+    phase,
+    lifecycleEvent,
+    activeRun,
+    agentStates,
+    locks,
+    messages,
+    errorMessage,
+    slashOutput,
+    historyRuns,
+    historySnapshots,
+    rollbackChain,
+    pendingRollbackSnapshotId,
+  } = state;
   const [inputValue, setInputValue] = useState('');
   const [awaitingInitConfirm, setAwaitingInitConfirm] = useState(false);
 
@@ -76,6 +91,29 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) =
   // ── Slash command result wiring ────────────────────────────────────────────
   useEffect(() => {
     const onSlashResult = (payload: { command: string; output: string }) => {
+      if (payload.command === '/history') {
+        try {
+          const data = JSON.parse(payload.output) as { type: string; [key: string]: unknown };
+          if (data.type === 'history_view') {
+            dispatch({
+              type: 'SET_HISTORY_DATA',
+              runs: data.runs as TaskRun[],
+              snapshots: data.snapshots as SnapshotMeta[],
+            });
+            return;
+          }
+          if (data.type === 'rollback_confirm') {
+            dispatch({
+              type: 'SET_ROLLBACK_CHAIN',
+              chain: data.chain as SnapshotMeta[],
+              snapshotId: data.snapshotId as string,
+            });
+            return;
+          }
+        } catch {
+          // Not JSON — fall through to plain text output
+        }
+      }
       dispatch({ type: 'SET_SLASH_OUTPUT', output: payload.output });
     };
     orchestrator.on('slash:result', onSlashResult);
@@ -241,6 +279,43 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) =
       <Box flexDirection="column" padding={1}>
         <Text color={THEME.primary}>Opening plan in editor...</Text>
       </Box>
+    );
+  }
+
+  // History browser
+  if (phase === 'history_view') {
+    return (
+      <HistoryView
+        runs={historyRuns}
+        snapshots={historySnapshots}
+        onRollbackRequest={(snapshotId) => {
+          orchestrator.sendSlashCommand('/history', `rollback ${snapshotId}`);
+        }}
+        onExit={() => {
+          dispatch({ type: 'SET_PHASE', phase: 'idle' });
+          dispatch({ type: 'SET_SLASH_OUTPUT', output: null });
+        }}
+      />
+    );
+  }
+
+  // Rollback cascade confirmation
+  if (phase === 'rollback_confirm') {
+    return (
+      <RollbackConfirm
+        chain={rollbackChain}
+        snapshotId={pendingRollbackSnapshotId ?? ''}
+        onConfirm={() => {
+          orchestrator.sendSlashCommand(
+            '/history',
+            `rollback ${pendingRollbackSnapshotId} confirm`,
+          );
+          dispatch({ type: 'SET_PHASE', phase: 'idle' });
+        }}
+        onCancel={() => {
+          dispatch({ type: 'SET_PHASE', phase: 'history_view' });
+        }}
+      />
     );
   }
 

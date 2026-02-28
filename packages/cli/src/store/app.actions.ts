@@ -4,6 +4,7 @@ import type {
   AgentState,
   FileLock,
   OllamaLifecycleEvent,
+  SnapshotMeta,
 } from '@nightfall/shared';
 import type { AppPhase } from './app.store.js';
 
@@ -21,4 +22,6 @@ export type AppAction =
   | { type: 'SET_SLASH_OUTPUT'; output: string | null }
   | { type: 'SET_PHASE'; phase: AppPhase }
   | { type: 'RESET_TASK' }
-  | { type: 'UPDATE_PLAN'; plan: TaskPlan };
+  | { type: 'UPDATE_PLAN'; plan: TaskPlan }
+  | { type: 'SET_HISTORY_DATA'; runs: TaskRun[]; snapshots: SnapshotMeta[] }
+  | { type: 'SET_ROLLBACK_CHAIN'; chain: SnapshotMeta[]; snapshotId: string };
