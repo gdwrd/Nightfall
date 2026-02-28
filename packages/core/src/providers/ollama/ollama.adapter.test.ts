@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import http from 'node:http';
-import type { NightfallConfig } from '@nightfall/shared';
+import type { NightfallConfig, ChatMessage } from '@nightfall/shared';
 import { OllamaAdapter } from './ollama.adapter.js';
 import { createProvider } from '../provider.factory.js';
 
@@ -136,12 +136,17 @@ afterAll(() => {
   server.close();
 });
 
+const HELLO_MESSAGES: ChatMessage[] = [
+  { role: 'system', content: 'You are helpful.' },
+  { role: 'user', content: 'Say hello' },
+];
+
 describe('OllamaAdapter', () => {
   it('streams tokens incrementally via complete()', async () => {
     const adapter = new OllamaAdapter(makeConfig());
     const chunks: string[] = [];
 
-    for await (const token of adapter.complete('Say hello', 'You are helpful.')) {
+    for await (const token of adapter.complete(HELLO_MESSAGES)) {
       chunks.push(token);
     }
 
@@ -155,11 +160,7 @@ describe('OllamaAdapter', () => {
     controller.abort();
 
     const chunks: string[] = [];
-    for await (const token of adapter.complete(
-      'Say hello',
-      'You are helpful.',
-      controller.signal,
-    )) {
+    for await (const token of adapter.complete(HELLO_MESSAGES, controller.signal)) {
       chunks.push(token);
     }
 
@@ -171,11 +172,7 @@ describe('OllamaAdapter', () => {
     const controller = new AbortController();
     const chunks: string[] = [];
 
-    for await (const token of adapter.complete(
-      'Say hello',
-      'You are helpful.',
-      controller.signal,
-    )) {
+    for await (const token of adapter.complete(HELLO_MESSAGES, controller.signal)) {
       chunks.push(token);
       // Abort after collecting the first token
       if (chunks.length === 1) {
