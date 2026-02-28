@@ -7,7 +7,7 @@ export default [
   js.configs.recommended,
   ...tsPlugin.configs['flat/recommended'],
   {
-    files: ['**/*.ts'],
+    files: ['**/*.{ts,tsx}'],
     languageOptions: {
       parser: tsParser,
       ecmaVersion: 2022,

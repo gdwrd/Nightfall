@@ -32,7 +32,7 @@ interface AppProps {
 // App
 // ---------------------------------------------------------------------------
 
-export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) => {
+export const App: React.FC<AppProps> = ({ config, orchestrator }) => {
   const { exit } = useApp();
   const [state, dispatch] = useAppStore();
   const {

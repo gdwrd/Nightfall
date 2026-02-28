@@ -7,7 +7,7 @@ const DEFAULT_AGENTS = ['team-lead', 'engineer', 'reviewer', 'memory-manager'];
 export async function agentsHandler(ctx: CommandDispatcherContext): Promise<string> {
   const overridesDir = path.join(ctx.projectRoot, '.nightfall', '.agents');
 
-  let overrides: Set<string> = new Set();
+  const overrides: Set<string> = new Set();
   try {
     const entries = await fs.readdir(overridesDir);
     for (const entry of entries) {
