@@ -10,6 +10,7 @@ import { TaskOrchestrator } from '../orchestrator/task.orchestrator.js';
 import { ensureOllama } from '../ollama/ollama.lifecycle.js';
 import { WsBroadcaster } from './ws.broadcaster.js';
 import type { PendingApprovalHandle } from './ws.broadcaster.js';
+import { CommandDispatcher } from '../commands/command.dispatcher.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -49,6 +50,8 @@ export class NightfallServer extends EventEmitter {
   private readonly broadcaster: WsBroadcaster;
   private readonly config: NightfallConfig;
 
+  private readonly dispatcher: CommandDispatcher;
+
   /** Handle to the pending plan-approval task ID (managed by WsBroadcaster). */
   private approval: PendingApprovalHandle | null = null;
 
@@ -70,6 +73,12 @@ export class NightfallServer extends EventEmitter {
       config: options.config,
       provider: options.provider,
       projectRoot: options.projectRoot,
+    });
+
+    this.dispatcher = new CommandDispatcher({
+      config: options.config,
+      projectRoot: options.projectRoot,
+      orchestrator: this.orchestrator,
     });
   }
 
@@ -175,10 +184,10 @@ export class NightfallServer extends EventEmitter {
       }
 
       case 'SLASH_COMMAND': {
-        // Slash commands are handled client-side; echo back so client can confirm receipt
+        const output = await this.dispatcher.dispatch(msg.payload.command, msg.payload.args);
         this.broadcaster.send(ws, {
           type: 'SLASH_RESULT',
-          payload: { command: msg.payload.command, output: '' },
+          payload: { command: msg.payload.command, output },
         });
         break;
       }

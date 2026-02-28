@@ -59,3 +59,6 @@ export { NightfallServer } from './server/websocket.server.js';
 export type { NightfallServerOptions } from './server/websocket.server.js';
 export { WsBroadcaster } from './server/ws.broadcaster.js';
 export type { PendingApprovalHandle } from './server/ws.broadcaster.js';
+// Phase 16 — Slash Commands
+export { CommandDispatcher } from './commands/command.dispatcher.js';
+export type { CommandDispatcherContext } from './commands/command.dispatcher.js';

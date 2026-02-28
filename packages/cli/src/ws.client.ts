@@ -23,17 +23,26 @@ export interface IOrchestrator extends EventEmitter {
   on(event: 'agent:state', listener: (state: AgentState) => void): this;
   on(event: 'lock:update', listener: (locks: FileLock[]) => void): this;
   on(event: 'lifecycle', listener: (event: OllamaLifecycleEvent) => void): this;
+  on(
+    event: 'slash:result',
+    listener: (payload: { command: string; output: string }) => void,
+  ): this;
   on(event: string, listener: (...args: unknown[]) => void): this;
 
   off(event: 'task:status', listener: (run: TaskRun) => void): this;
   off(event: 'agent:state', listener: (state: AgentState) => void): this;
   off(event: 'lock:update', listener: (locks: FileLock[]) => void): this;
   off(event: 'lifecycle', listener: (event: OllamaLifecycleEvent) => void): this;
+  off(
+    event: 'slash:result',
+    listener: (payload: { command: string; output: string }) => void,
+  ): this;
   off(event: string, listener: (...args: unknown[]) => void): this;
 
   submitTask(prompt: string, signal?: AbortSignal): Promise<TaskRun>;
   approvePlan(taskId: string, signal?: AbortSignal, editedPlan?: TaskPlan): Promise<TaskRun>;
   getLocks(): FileLock[];
+  sendSlashCommand(command: string, args: string): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -170,6 +179,11 @@ export class NightfallWsClient extends EventEmitter implements IOrchestrator {
     return this._locks;
   }
 
+  /** Send a slash command to the server for server-side processing. */
+  sendSlashCommand(command: string, args: string): void {
+    this.send({ type: 'SLASH_COMMAND', payload: { command, args } });
+  }
+
   // ---------------------------------------------------------------------------
   // Inbound message routing
   // ---------------------------------------------------------------------------
@@ -197,7 +211,11 @@ export class NightfallWsClient extends EventEmitter implements IOrchestrator {
         this.emit('error', new Error(msg.payload.message));
         break;
 
-      // PLAN_READY, TASK_COMPLETE, SLASH_RESULT: handled via TASK_STATE events
+      case 'SLASH_RESULT':
+        this.emit('slash:result', msg.payload);
+        break;
+
+      // PLAN_READY, TASK_COMPLETE: handled via TASK_STATE events
       default:
         break;
     }

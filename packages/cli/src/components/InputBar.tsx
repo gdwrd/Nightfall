@@ -12,15 +12,22 @@ export type InputMode =
 interface InputBarProps {
   mode: InputMode;
   onSubmit: (value: string) => void;
+  onValueChange?: (value: string) => void;
   completionMessage?: string;
 }
 
-export const InputBar: React.FC<InputBarProps> = ({ mode, onSubmit, completionMessage }) => {
+export const InputBar: React.FC<InputBarProps> = ({
+  mode,
+  onSubmit,
+  onValueChange,
+  completionMessage,
+}) => {
   const [value, setValue] = useState('');
 
   const handleSubmit = (val: string) => {
     const trimmed = val.trim();
     setValue('');
+    onValueChange?.('');
     if (trimmed) onSubmit(trimmed);
   };
 
@@ -51,7 +58,10 @@ export const InputBar: React.FC<InputBarProps> = ({ mode, onSubmit, completionMe
       </Text>
       <TextInput
         value={value}
-        onChange={setValue}
+        onChange={(v) => {
+          setValue(v);
+          onValueChange?.(v);
+        }}
         onSubmit={handleSubmit}
         placeholder={placeholder}
       />
