@@ -17,9 +17,11 @@
     "@nightfall/shared": "*",
     "@types/diff": "^7.0.2",
     "@types/js-yaml": "^4.0.9",
+    "@types/ws": "^8.18.1",
     "diff": "^8.0.3",
     "js-yaml": "^4.1.1",
-    "ollama": "^0.6.3"
+    "ollama": "^0.6.3",
+    "ws": "^8.19.0"
   },
   "devDependencies": {
     "@types/node": "^25.3.2",

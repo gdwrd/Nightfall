@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text, useApp, useInput } from 'ink';
 import type { NightfallConfig, TaskRun, AgentState, FileLock } from '@nightfall/shared';
-import { ensureOllama, TaskOrchestrator } from '@nightfall/core';
-import type { OllamaLifecycleEvent } from '@nightfall/core';
+import type { OllamaLifecycleEvent } from '@nightfall/shared';
+import type { IOrchestrator } from '../ws.client.js';
 import { THEME } from '../theme.js';
 import { Header } from './Header.js';
 import { LifecycleView } from './LifecycleView.js';
@@ -28,7 +28,7 @@ type AppPhase =
 
 interface AppProps {
   config: NightfallConfig;
-  orchestrator: TaskOrchestrator;
+  orchestrator: IOrchestrator;
   projectRoot: string;
 }
 
@@ -50,12 +50,9 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) =
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // ── Ollama lifecycle ───────────────────────────────────────────────────────
+  // ── Ollama lifecycle — received as events from the orchestrator/server ─────
   useEffect(() => {
-    let cancelled = false;
-
-    ensureOllama(config, (event) => {
-      if (cancelled) return;
+    const onLifecycle = (event: OllamaLifecycleEvent) => {
       setLifecycleEvent(event);
       if (event.type === 'model_ready') {
         setPhase('idle');
@@ -63,15 +60,11 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) =
         setErrorMessage(event.message);
         setPhase('error');
       }
-    }).catch((err: unknown) => {
-      if (!cancelled) {
-        setErrorMessage(err instanceof Error ? err.message : String(err));
-        setPhase('error');
-      }
-    });
+    };
 
-    return () => { cancelled = true; };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    orchestrator.on('lifecycle', onLifecycle);
+    return () => { orchestrator.off('lifecycle', onLifecycle); };
+  }, [orchestrator]);
 
   // ── Orchestrator event wiring ──────────────────────────────────────────────
   useEffect(() => {
@@ -148,6 +141,10 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) =
       const result = await handleSlashCommand(input, { config, orchestrator, projectRoot, addMessage });
       if (result === 'exit') {
         exit();
+        return;
+      }
+      if (result === '[clear]') {
+        setMessages([]);
         return;
       }
       if (result) addMessage(result);
@@ -266,4 +263,3 @@ function messageColor(msg: string): string {
   if (msg.startsWith('Error') || msg.startsWith('Fatal')) return THEME.error;
   return THEME.textDim;
 }
-

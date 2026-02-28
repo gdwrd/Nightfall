@@ -1,6 +1,6 @@
 import type { NightfallConfig } from '@nightfall/shared';
-import type { TaskOrchestrator } from '@nightfall/core';
 import { initializeMemoryBank, TaskLogger } from '@nightfall/core';
+import type { IOrchestrator } from './ws.client.js';
 import * as path from 'node:path';
 
 // ---------------------------------------------------------------------------
@@ -25,7 +25,7 @@ export const SLASH_COMMANDS: Record<string, string> = {
 
 export interface SlashCommandContext {
   config: NightfallConfig;
-  orchestrator: TaskOrchestrator;
+  orchestrator: IOrchestrator;
   projectRoot: string;
   addMessage: (msg: string) => void;
 }
