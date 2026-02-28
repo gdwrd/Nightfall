@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import type { NightfallConfig } from '@nightfall/shared';
 
 export type OllamaLifecycleEvent =
@@ -11,6 +11,18 @@ export type OllamaLifecycleEvent =
   | { type: 'fatal'; message: string };
 
 export type LifecycleEventHandler = (event: OllamaLifecycleEvent) => void;
+
+/**
+ * Check whether the `ollama` binary is installed on the system.
+ */
+export function isOllamaInstalled(): boolean {
+  try {
+    execFileSync('which', ['ollama'], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Check whether the Ollama HTTP server is reachable.
@@ -139,6 +151,14 @@ export async function ensureOllama(
   const running = await isOllamaRunning(host, port);
 
   if (!running) {
+    if (!isOllamaInstalled()) {
+      onEvent({
+        type: 'fatal',
+        message: 'Ollama is required. Install at https://ollama.ai',
+      });
+      process.exit(1);
+    }
+
     onEvent({ type: 'starting' });
     try {
       await startOllama(host, port);
