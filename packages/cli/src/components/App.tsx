@@ -8,9 +8,10 @@ import { Header } from './Header.js';
 import { LifecycleView } from './LifecycleView.js';
 import { AgentGrid } from './AgentGrid.js';
 import { StatusBar } from './StatusBar.js';
-import { PlanView } from './PlanView.js';
+import { PlanReview } from './PlanReview.js';
 import { InputBar } from './InputBar.js';
 import type { InputMode } from './InputBar.js';
+import { editPlanInEditor } from './PlanEditor.js';
 import { handleSlashCommand } from '../slash.commands.js';
 import { useAppStore } from '../store/app.store.js';
 
@@ -115,6 +116,24 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) =
         addMessage('Plan rejected. Submit a revised task.');
         return;
       }
+      if (lower === 'e' || lower === 'edit') {
+        if (!activeRun.plan) return;
+        dispatch({ type: 'SET_PHASE', phase: 'editing_plan' });
+        // Defer so ink can release the terminal before spawning the editor
+        setTimeout(() => {
+          process.stdin.setRawMode?.(false);
+          const edited = editPlanInEditor(activeRun.plan!);
+          process.stdin.setRawMode?.(true);
+          if (edited) {
+            dispatch({ type: 'UPDATE_PLAN', plan: edited });
+            addMessage('Plan updated from editor.');
+          } else {
+            addMessage('No changes made.');
+          }
+          dispatch({ type: 'SET_PHASE', phase: 'awaiting_approval' });
+        }, 50);
+        return;
+      }
       // Treat anything else as a revised task prompt — fall through
     }
 
@@ -132,7 +151,7 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) =
 
   // ── Derive InputBar mode ───────────────────────────────────────────────────
   const inputMode: InputMode =
-    phase === 'running' || phase === 'planning'
+    phase === 'running' || phase === 'planning' || phase === 'editing_plan'
       ? 'running'
       : phase === 'awaiting_approval'
         ? 'plan_approval'
@@ -160,6 +179,15 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) =
     return <LifecycleView event={lifecycleEvent} />;
   }
 
+  // Editor is open — show minimal UI
+  if (phase === 'editing_plan') {
+    return (
+      <Box flexDirection="column" padding={1}>
+        <Text color={THEME.primary}>Opening plan in editor...</Text>
+      </Box>
+    );
+  }
+
   // Main UI
   return (
     <Box flexDirection="column">
@@ -167,7 +195,7 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) =
 
       {/* Plan approval view */}
       {phase === 'awaiting_approval' && activeRun?.plan && (
-        <PlanView plan={activeRun.plan} />
+        <PlanReview plan={activeRun.plan} />
       )}
 
       {/* Agent panels — visible during execution and after completion */}

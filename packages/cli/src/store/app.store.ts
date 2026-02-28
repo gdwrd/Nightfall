@@ -10,7 +10,8 @@ export type AppPhase =
   | 'lifecycle'         // Ollama startup in progress
   | 'idle'             // Ready for user input
   | 'planning'         // Team Lead drafting the plan
-  | 'awaiting_approval' // Plan ready, waiting for y/n
+  | 'awaiting_approval' // Plan ready, waiting for y/n/e
+  | 'editing_plan'     // External editor open for plan editing
   | 'running'          // Engineers / reviewer executing
   | 'completed'        // Task finished
   | 'error';           // Fatal error
@@ -111,6 +112,14 @@ function reducer(state: AppState, action: AppAction): AppState {
 
     case 'RESET_TASK':
       return { ...state, activeRun: null, agentStates: {}, locks: [], slashOutput: null };
+
+    case 'UPDATE_PLAN':
+      return {
+        ...state,
+        activeRun: state.activeRun
+          ? { ...state.activeRun, plan: action.plan }
+          : null,
+      };
 
     default:
       return state;

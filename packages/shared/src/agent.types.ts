@@ -8,6 +8,8 @@ export interface AgentState {
   status: AgentStatus;
   currentAction: string | null;
   log: AgentLogEntry[];
+  /** Final summary produced by the agent, populated when status becomes 'done'. */
+  summary?: string;
 }
 
 export interface AgentLogEntry {

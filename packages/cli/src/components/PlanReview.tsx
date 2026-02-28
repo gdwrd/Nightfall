@@ -3,11 +3,11 @@ import { Box, Text } from 'ink';
 import type { TaskPlan } from '@nightfall/shared';
 import { THEME } from '../theme.js';
 
-interface PlanViewProps {
+interface PlanReviewProps {
   plan: TaskPlan;
 }
 
-export const PlanView: React.FC<PlanViewProps> = ({ plan }) => {
+export const PlanReview: React.FC<PlanReviewProps> = ({ plan }) => {
   return (
     <Box flexDirection="column" borderStyle="single" borderColor={THEME.accent} paddingX={1} marginY={1}>
       {/* Plan header */}
@@ -37,8 +37,9 @@ export const PlanView: React.FC<PlanViewProps> = ({ plan }) => {
       <Box marginTop={1} borderStyle="single" borderColor={THEME.dimBorder} paddingX={1}>
         <Text color={THEME.warning}>Approve plan? </Text>
         <Text color={THEME.textDim}>
-          Type <Text bold color={THEME.success}>y</Text> to proceed ·{' '}
-          <Text bold color={THEME.error}>n</Text> to cancel · or revise your task below
+          <Text bold color={THEME.success}>Y</Text>es ·{' '}
+          <Text bold color={THEME.error}>N</Text>o ·{' '}
+          <Text bold color={THEME.accent}>E</Text>dit · or revise your task
         </Text>
       </Box>
     </Box>

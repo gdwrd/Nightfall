@@ -1,4 +1,4 @@
-import type { TaskRun, AgentState, FileLock, OllamaLifecycleEvent } from '@nightfall/shared';
+import type { TaskRun, TaskPlan, AgentState, FileLock, OllamaLifecycleEvent } from '@nightfall/shared';
 import type { AppPhase } from './app.store.js';
 
 // ---------------------------------------------------------------------------
@@ -14,4 +14,5 @@ export type AppAction =
   | { type: 'CLEAR_MESSAGES' }
   | { type: 'SET_SLASH_OUTPUT'; output: string | null }
   | { type: 'SET_PHASE'; phase: AppPhase }
-  | { type: 'RESET_TASK' };
+  | { type: 'RESET_TASK' }
+  | { type: 'UPDATE_PLAN'; plan: TaskPlan };

@@ -151,7 +151,7 @@ export class NightfallServer extends EventEmitter {
         this.approval?.clearPendingTaskId();
         const ac = new AbortController();
         this.activeAbortController = ac;
-        this.orchestrator.approvePlan(taskId, ac.signal).catch((err: unknown) => {
+        this.orchestrator.approvePlan(taskId, ac.signal, msg.payload.editedPlan).catch((err: unknown) => {
           const message = err instanceof Error ? err.message : String(err);
           this.broadcaster.send(ws, { type: 'ERROR', payload: { message } });
         });

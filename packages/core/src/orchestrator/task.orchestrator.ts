@@ -167,12 +167,17 @@ export class TaskOrchestrator extends EventEmitter {
    * Creates a pre-task snapshot, then runs engineers → reviewer → (rework loop)
    * → memory manager. Returns the final TaskRun.
    */
-  async approvePlan(taskId: string, signal?: AbortSignal): Promise<TaskRun> {
+  async approvePlan(taskId: string, signal?: AbortSignal, editedPlan?: TaskPlan): Promise<TaskRun> {
     const run = this.activeRuns.get(taskId);
     if (!run) throw new Error(`Unknown task: ${taskId}`);
     if (!run.plan) throw new Error(`Task ${taskId} has no plan to approve`);
     if (run.status !== 'awaiting_approval') {
       throw new Error(`Task ${taskId} is not awaiting approval (status: ${run.status})`);
+    }
+
+    // Apply user-edited plan if provided
+    if (editedPlan) {
+      run.plan = editedPlan;
     }
 
     // Create a snapshot of all files expected to change

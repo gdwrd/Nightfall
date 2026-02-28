@@ -6,13 +6,13 @@ import { THEME } from '../theme.js';
 export interface AgentPanelProps {
   label: string;
   state?: AgentState;
-  /** When true the panel collapses to a single summary line. */
-  collapsed?: boolean;
 }
 
-export const AgentPanel: React.FC<AgentPanelProps> = ({ label, state, collapsed }) => {
+export const AgentPanel: React.FC<AgentPanelProps> = ({ label, state }) => {
   const status = state?.status ?? 'idle';
-  const isActive = status === 'thinking' || status === 'acting';
+  const isThinking = status === 'thinking';
+  const isActing = status === 'acting';
+  const isActive = isThinking || isActing;
   const isDone = status === 'done';
   const isError = status === 'error';
 
@@ -21,26 +21,19 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({ label, state, collapsed 
     ? THEME.success
     : isError
       ? THEME.error
-      : isActive
-        ? THEME.primary
-        : THEME.dim;
+      : isThinking
+        ? THEME.accent
+        : isActing
+          ? THEME.text
+          : THEME.dim;
 
   const borderColor = isActive ? THEME.accent : isDone ? THEME.success : THEME.dimBorder;
 
-  // Collapsed: single-line summary after completion
-  if (collapsed && isDone) {
-    const lastEntry = state?.log[state.log.length - 1];
-    const summary = lastEntry ? truncate(lastEntry.content, 60) : 'completed';
-    return (
-      <Box borderStyle="single" borderColor={THEME.success} paddingX={1}>
-        <Text color={THEME.success}>✓ </Text>
-        <Text bold color={THEME.textDim}>
-          {label}
-        </Text>
-        <Text color={THEME.dim}> — {summary}</Text>
-      </Box>
-    );
-  }
+  const labelColor = isThinking
+    ? THEME.accent
+    : isActing
+      ? THEME.text
+      : THEME.textDim;
 
   // Recent log entries (last 4)
   const recentLog = (state?.log ?? []).slice(-4);
@@ -49,7 +42,7 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({ label, state, collapsed 
     <Box borderStyle="single" borderColor={borderColor} flexDirection="column" paddingX={1}>
       {/* Header row */}
       <Box justifyContent="space-between">
-        <Text bold color={isActive ? THEME.primary : THEME.textDim}>
+        <Text bold color={labelColor}>
           {label}
         </Text>
         <Text color={dotColor}>
@@ -66,7 +59,7 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({ label, state, collapsed 
 
       {/* Log lines */}
       {recentLog.map((entry, i) => (
-        <LogLine key={i} entry={entry} />
+        <LogLine key={`${entry.timestamp}-${i}`} entry={entry} />
       ))}
 
       {/* Placeholder when idle/waiting */}
@@ -79,7 +72,7 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({ label, state, collapsed 
   );
 };
 
-const LogLine: React.FC<{ entry: AgentLogEntry }> = ({ entry }) => {
+const LogLine = React.memo<{ entry: AgentLogEntry }>(({ entry }) => {
   const prefix = entry.type === 'tool_call' ? '⚙ ' : entry.type === 'tool_result' ? '← ' : '  ';
   const color =
     entry.type === 'tool_call'
@@ -94,7 +87,9 @@ const LogLine: React.FC<{ entry: AgentLogEntry }> = ({ entry }) => {
       {truncate(entry.content, 55)}
     </Text>
   );
-};
+});
+
+LogLine.displayName = 'LogLine';
 
 function truncate(str: string, max: number): string {
   const single = str.replace(/\n/g, ' ').trim();
