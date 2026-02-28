@@ -106,14 +106,20 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
       dispatch({ type: 'LOCK_UPDATE', locks: updated });
     };
 
+    const onWsError = (err: Error) => {
+      dispatch({ type: 'ADD_MESSAGE', message: `! Connection error: ${err.message}` });
+    };
+
     orchestrator.on('task:status', onTaskStatus);
     orchestrator.on('agent:state', onAgentState);
     orchestrator.on('lock:update', onLockUpdate);
+    orchestrator.on('ws:error', onWsError);
 
     return () => {
       orchestrator.off('task:status', onTaskStatus);
       orchestrator.off('agent:state', onAgentState);
       orchestrator.off('lock:update', onLockUpdate);
+      orchestrator.off('ws:error', onWsError);
     };
   }, [orchestrator, dispatch]);
 
