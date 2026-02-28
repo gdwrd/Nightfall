@@ -74,6 +74,10 @@ export async function loadConfig(): Promise<NightfallConfig> {
     if (parsed !== null && typeof parsed === 'object') {
       userConfig = parsed as Partial<NightfallConfig>;
     }
+  } else {
+    const defaultYaml = yaml.dump(DEFAULT_CONFIG as unknown as Record<string, unknown>);
+    fs.writeFileSync(CONFIG_PATH, defaultYaml, 'utf8');
+    process.stderr.write(`Created default config at ${CONFIG_PATH}\n`);
   }
 
   const merged = deepMerge(

@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * nightfall — local-first multi-agent CLI coding tool
  *
