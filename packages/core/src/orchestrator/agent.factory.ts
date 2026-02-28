@@ -154,6 +154,53 @@ Your done signal:
 
 Signal done when all relevant memory files have been updated.`;
 
+export const CLASSIFIER_PROMPT = `\
+You are a request classifier for Nightfall, a multi-agent coding assistant.
+
+Your only job is to read the user's request and classify it as one of two types:
+
+- "coding_task": Any request that requires modifying, creating, or deleting files in the
+  codebase. This includes bug fixes, new features, refactors, and test additions.
+- "question": Any request asking for an explanation, clarification, definition, or information
+  about the codebase, a concept, or a decision. Questions never require writing code.
+
+When in doubt, classify as "coding_task" — it is always safer to route to the full pipeline
+than to give an incomplete answer.
+
+Respond ONLY with a done signal. Do not explain. Do not ask clarifying questions.
+
+Your done signal:
+<done>
+{"type": "coding_task"}
+</done>
+
+or:
+
+<done>
+{"type": "question"}
+</done>`;
+
+export const RESPONDER_PROMPT = `\
+You are the Responder agent for Nightfall, a multi-agent coding assistant.
+
+Your role is to answer the user's question directly and concisely, using the project codebase
+and memory bank as your source of truth.
+
+Guidelines:
+- Use read_memory with file "index" to discover relevant memory files, then load them
+- Use read_file to examine source files that are relevant to the question
+- Answer only what was asked — do not perform code changes, propose plans, or run commands
+- If you cannot find enough information to answer confidently, say so explicitly
+- Keep answers focused: prefer concrete references to specific files, functions, or patterns
+  over general explanations
+
+Your done signal must contain your answer as a plain string:
+<done>
+{"summary": "Your complete answer to the user's question here."}
+</done>
+
+Signal done once you have gathered enough information to answer thoroughly.`;
+
 // ---------------------------------------------------------------------------
 // Factory options
 // ---------------------------------------------------------------------------
@@ -162,7 +209,9 @@ export interface AgentFactoryOptions {
   provider: ProviderAdapter;
   projectRoot: string;
   /** Override any agent's system prompt with a custom one. */
-  customPrompts?: Partial<Record<'team-lead' | 'engineer' | 'reviewer' | 'memory-manager', string>>;
+  customPrompts?: Partial<
+    Record<'team-lead' | 'engineer' | 'reviewer' | 'memory-manager' | 'classifier' | 'responder', string>
+  >;
 }
 
 // ---------------------------------------------------------------------------
@@ -222,6 +271,34 @@ export function createMemoryManagerAgent(
     projectRoot: options.projectRoot,
     systemPrompt: options.customPrompts?.['memory-manager'] ?? MEMORY_MANAGER_PROMPT,
     maxIterations: 20,
+  };
+  return new BaseAgent(config, options.provider, toolRegistry);
+}
+
+export function createClassifierAgent(
+  options: AgentFactoryOptions,
+  toolRegistry: ToolRegistry,
+): BaseAgent {
+  const config: AgentConfig = {
+    id: 'classifier',
+    role: 'classifier',
+    projectRoot: options.projectRoot,
+    systemPrompt: options.customPrompts?.['classifier'] ?? CLASSIFIER_PROMPT,
+    maxIterations: 1,
+  };
+  return new BaseAgent(config, options.provider, toolRegistry);
+}
+
+export function createResponderAgent(
+  options: AgentFactoryOptions,
+  toolRegistry: ToolRegistry,
+): BaseAgent {
+  const config: AgentConfig = {
+    id: 'responder',
+    role: 'responder',
+    projectRoot: options.projectRoot,
+    systemPrompt: options.customPrompts?.['responder'] ?? RESPONDER_PROMPT,
+    maxIterations: 10,
   };
   return new BaseAgent(config, options.provider, toolRegistry);
 }

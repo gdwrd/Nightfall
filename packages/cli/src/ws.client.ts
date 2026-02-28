@@ -120,7 +120,12 @@ export class NightfallWsClient extends EventEmitter implements IOrchestrator {
       }
 
       const onStatus = (run: TaskRun) => {
-        if (run.status === 'planning' || run.status === 'awaiting_approval') {
+        if (
+          run.status === 'planning' ||
+          run.status === 'awaiting_approval' ||
+          run.status === 'answered' ||
+          run.status === 'cancelled'
+        ) {
           this.off('task:status', onStatus);
           resolve(run);
         }

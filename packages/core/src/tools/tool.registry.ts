@@ -21,6 +21,8 @@ const ROLE_TOOLS: Record<AgentRole, string[]> = {
   engineer: ['read_memory', 'read_file', 'write_diff', 'run_command'],
   reviewer: ['read_memory', 'read_file', 'run_command'],
   'memory-manager': ['read_file', 'write_memory', 'update_index'],
+  classifier: [],
+  responder: ['read_memory', 'read_file'],
 };
 
 const ALL_TOOLS: ToolImpl[] = [

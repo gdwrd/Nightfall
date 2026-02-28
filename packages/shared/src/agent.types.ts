@@ -1,4 +1,10 @@
-export type AgentRole = 'team-lead' | 'engineer' | 'reviewer' | 'memory-manager';
+export type AgentRole =
+  | 'team-lead'
+  | 'engineer'
+  | 'reviewer'
+  | 'memory-manager'
+  | 'classifier'
+  | 'responder';
 
 export type AgentStatus = 'idle' | 'thinking' | 'acting' | 'waiting' | 'done' | 'error';
 

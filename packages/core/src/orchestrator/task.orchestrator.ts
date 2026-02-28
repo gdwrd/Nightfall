@@ -21,6 +21,8 @@ import {
   createEngineerAgent,
   createReviewerAgent,
   createMemoryManagerAgent,
+  createClassifierAgent,
+  createResponderAgent,
   type AgentFactoryOptions,
 } from './agent.factory.js';
 import { TaskLogger } from './task.logger.js';
@@ -127,18 +129,45 @@ export class TaskOrchestrator extends EventEmitter {
       id: taskId,
       prompt,
       plan: null,
-      status: 'planning',
+      status: 'classifying',
       reworkCycles: 0,
       agentStates: {},
       startedAt: Date.now(),
       completedAt: null,
       snapshotId: null,
+      requestType: null,
+      answer: null,
     };
 
     this.activeRuns.set(taskId, run);
     this.emit('task:status', this.snapshot(run));
 
+    // ── Phase 1: Classify ───────────────────────────────────────────────────
     const factoryOptions = await this.buildFactoryOptions();
+    const classifierRegistry = new ToolRegistry();
+    const classifier = createClassifierAgent(factoryOptions, classifierRegistry);
+    this.wireAgentEvents(classifier, run);
+
+    const classifyResult = await classifier.run({ task: prompt, signal });
+    run.agentStates['classifier'] = classifier.state;
+
+    if (signal?.aborted) {
+      return this.cancelRun(run);
+    }
+
+    const requestType = this.parseClassification(classifyResult.summary);
+    run.requestType = requestType;
+
+    // ── Phase 2: Route ──────────────────────────────────────────────────────
+    if (requestType === 'question') {
+      return this.runQuestionPath(run, factoryOptions, signal);
+    }
+
+    // coding_task — continue with Team Lead planning
+    run.status = 'planning';
+    this.activeRuns.set(taskId, run);
+    this.emit('task:status', this.snapshot(run));
+
     const toolRegistry = new ToolRegistry();
     const teamLead = createTeamLeadAgent(factoryOptions, toolRegistry);
     this.wireAgentEvents(teamLead, run);
@@ -434,6 +463,51 @@ export class TaskOrchestrator extends EventEmitter {
   }
 
   // ---------------------------------------------------------------------------
+  // Question path
+  // ---------------------------------------------------------------------------
+
+  private async runQuestionPath(
+    run: TaskRun,
+    factoryOptions: AgentFactoryOptions,
+    signal?: AbortSignal,
+  ): Promise<TaskRun> {
+    run.status = 'answering';
+    this.activeRuns.set(run.id, run);
+    this.emit('task:status', this.snapshot(run));
+
+    const toolRegistry = new ToolRegistry();
+    const responder = createResponderAgent(factoryOptions, toolRegistry);
+    this.wireAgentEvents(responder, run);
+
+    const result = await responder.run({ task: run.prompt, signal });
+    run.agentStates['responder'] = responder.state;
+
+    if (signal?.aborted) {
+      return this.cancelRun(run);
+    }
+
+    run.answer = result.summary;
+    run.status = 'answered';
+    run.completedAt = Date.now();
+
+    this.activeRuns.set(run.id, run);
+    this.emit('task:status', this.snapshot(run));
+    await this.persistLog(run);
+
+    return this.snapshot(run);
+  }
+
+  private parseClassification(summary: string): 'coding_task' | 'question' {
+    try {
+      const parsed = JSON.parse(summary) as Record<string, unknown>;
+      if (parsed['type'] === 'question') return 'question';
+    } catch {
+      // Malformed — default to coding_task (safe fallback)
+    }
+    return 'coding_task';
+  }
+
+  // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
 
@@ -446,7 +520,7 @@ export class TaskOrchestrator extends EventEmitter {
     };
 
     const agentsDir = path.join(this.options.projectRoot, '.nightfall', '.agents');
-    const roles = ['team-lead', 'engineer', 'reviewer', 'memory-manager'] as const;
+    const roles = ['team-lead', 'engineer', 'reviewer', 'memory-manager', 'classifier', 'responder'] as const;
 
     for (const role of roles) {
       try {
