@@ -222,7 +222,7 @@ export class TaskOrchestrator extends EventEmitter {
 
       if (reviewResult.passed) {
         // ── Memory Manager ──────────────────────────────────────────────────
-        await this.runMemoryManager(run, signal);
+        await this.runMemoryManager(run, engineerResults, signal);
 
         run.status = 'completed';
         run.completedAt = Date.now();
@@ -238,13 +238,19 @@ export class TaskOrchestrator extends EventEmitter {
       run.status = 'reworking';
       this.emit('task:status', this.snapshot(run));
 
-      // Inject reviewer feedback into each subtask description
-      const issuesSummary = reviewResult.issues.join('\n- ');
+      // Inject structured rework context into each subtask. Each engineer gets
+      // its own previous attempt summary alongside the reviewer's issues so it
+      // knows exactly what went wrong on the prior attempt.
+      const issueLines = reviewResult.issues.map((i) => `- ${i}`).join('\n');
       for (const subtask of run.plan.subtasks) {
+        const previousAttempt =
+          engineerResults.find((r) => r.subtaskId === subtask.id)?.summary ??
+          '(no summary from previous attempt)';
         subtask.description =
-          `[REWORK cycle ${run.reworkCycles}]\n` +
-          `Original task: ${subtask.description}\n\n` +
-          `Reviewer issues to fix:\n- ${issuesSummary}`;
+          `[REWORK — cycle ${run.reworkCycles}]\n\n` +
+          `Original task:\n${subtask.description}\n\n` +
+          `Your previous attempt result:\n${previousAttempt}\n\n` +
+          `Reviewer found these issues — fix ALL of them:\n${issueLines}`;
         subtask.status = 'pending';
       }
     }
@@ -270,41 +276,69 @@ export class TaskOrchestrator extends EventEmitter {
     const maxEngineers = this.options.config.concurrency.max_engineers;
     const results: EngineerResult[] = [];
     const factoryOptions = await this.buildFactoryOptions();
+    let engineerCounter = 0;
 
-    // Subtasks that still need to run (pending or previously failed)
-    const pending = run.plan.subtasks.filter((s) => s.status !== 'done');
-
-    // Process in batches of maxEngineers
-    for (let batchStart = 0; batchStart < pending.length; batchStart += maxEngineers) {
+    // Process subtasks in dependency-aware waves. Each iteration finds all
+    // subtasks whose dependencies are satisfied and runs them concurrently
+    // (up to maxEngineers at a time), then repeats until none remain.
+    let madeProgress = true;
+    while (madeProgress) {
       if (signal?.aborted) break;
 
-      const batch = pending.slice(batchStart, batchStart + maxEngineers);
-
-      const batchResults = await Promise.all(
-        batch.map(async (subtask, indexInBatch) => {
-          const engineerIndex = batchStart + indexInBatch + 1;
-          const engineerId = `engineer-${engineerIndex}`;
-          const toolRegistry = new ToolRegistry();
-          const engineer = createEngineerAgent(engineerId, factoryOptions, toolRegistry);
-          this.wireAgentEvents(engineer, run);
-
-          subtask.assignedTo = engineerId;
-          subtask.status = 'in_progress';
-
-          const result = await engineer.run({ task: subtask.description, signal });
-
-          subtask.status = signal?.aborted ? 'failed' : 'done';
-          run.agentStates[engineerId] = engineer.state;
-
-          const filesTouched = extractFilesTouched(engineer.state.log);
-          subtask.filesTouched = filesTouched;
-
-          return { subtaskId: subtask.id, summary: result.summary, filesChanged: filesTouched };
-        }),
+      // Ready = pending and every declared dependency has completed successfully.
+      const ready = run.plan.subtasks.filter(
+        (s) =>
+          s.status === 'pending' &&
+          (s.dependsOn ?? []).every(
+            (depId) => run.plan!.subtasks.find((d) => d.id === depId)?.status === 'done',
+          ),
       );
 
-      results.push(...batchResults);
-      this.activeRuns.set(run.id, run);
+      if (ready.length === 0) {
+        madeProgress = false;
+        break;
+      }
+
+      // Process the ready wave in batches of maxEngineers.
+      for (let batchStart = 0; batchStart < ready.length; batchStart += maxEngineers) {
+        if (signal?.aborted) break;
+
+        const batch = ready.slice(batchStart, batchStart + maxEngineers);
+
+        const batchResults = await Promise.all(
+          batch.map(async (subtask) => {
+            engineerCounter++;
+            const engineerId = `engineer-${engineerCounter}`;
+            const toolRegistry = new ToolRegistry();
+            const engineer = createEngineerAgent(engineerId, factoryOptions, toolRegistry);
+            this.wireAgentEvents(engineer, run);
+
+            subtask.assignedTo = engineerId;
+            subtask.status = 'in_progress';
+
+            const result = await engineer.run({ task: subtask.description, signal });
+
+            // An engineer is considered blocked if it hit maxIterations or
+            // signalled confidence "blocked" in its typed done signal.
+            const blocked = result.interrupted === true || isBlockedEngineer(result.summary);
+            subtask.status = signal?.aborted || blocked ? 'failed' : 'done';
+            run.agentStates[engineerId] = engineer.state;
+
+            const filesTouched = extractFilesTouched(engineer.state.log);
+            subtask.filesTouched = filesTouched;
+
+            return {
+              subtaskId: subtask.id,
+              summary: result.summary,
+              filesChanged: filesTouched,
+              interrupted: result.interrupted || blocked,
+            };
+          }),
+        );
+
+        results.push(...batchResults);
+        this.activeRuns.set(run.id, run);
+      }
     }
 
     return results;
@@ -325,16 +359,31 @@ export class TaskOrchestrator extends EventEmitter {
     this.wireAgentEvents(reviewer, run);
 
     const allFiles = [...new Set(engineerResults.flatMap((r) => r.filesChanged))];
-    const engineerSummary = engineerResults
-      .map((r) => `- Subtask ${r.subtaskId}: ${r.summary}`)
-      .join('\n');
+
+    // Format engineer done signals — pass structured JSON through when available
+    // so the reviewer can inspect confidence levels and concerns directly.
+    const engineerDetails = engineerResults
+      .map((r) => {
+        const prefix = `Subtask ${r.subtaskId}`;
+        if (r.interrupted) {
+          return `${prefix}: INTERRUPTED — engineer did not complete this subtask`;
+        }
+        try {
+          const typed = JSON.parse(r.summary) as Record<string, unknown>;
+          return `${prefix}:\n${JSON.stringify(typed, null, 2)}`;
+        } catch {
+          return `${prefix}: ${r.summary}`;
+        }
+      })
+      .join('\n\n');
 
     const reviewTask =
-      `Review the following completed work.\n\n` +
+      `Review the following completed engineering work.\n\n` +
       `Original task: ${run.prompt}\n\n` +
-      `Engineer summaries:\n${engineerSummary}\n\n` +
+      `Engineer done signals (structured):\n${engineerDetails}\n\n` +
       `Files changed:\n${allFiles.map((f) => `- ${f}`).join('\n') || '(none detected)'}\n\n` +
-      `Verify: implementation correctness, tests pass, no obvious bugs.`;
+      `IMPORTANT: Do not trust engineer-reported results. Re-run all tests and linting ` +
+      `independently. Verify every changed file. Check against the original task requirements.`;
 
     const result = await reviewer.run({ task: reviewTask, signal });
     run.agentStates['reviewer'] = reviewer.state;
@@ -347,7 +396,11 @@ export class TaskOrchestrator extends EventEmitter {
   // Memory Manager stage
   // ---------------------------------------------------------------------------
 
-  private async runMemoryManager(run: TaskRun, signal?: AbortSignal): Promise<void> {
+  private async runMemoryManager(
+    run: TaskRun,
+    engineerResults: EngineerResult[],
+    signal?: AbortSignal,
+  ): Promise<void> {
     if (!run.plan) return;
 
     const factoryOptions = await this.buildFactoryOptions();
@@ -357,12 +410,18 @@ export class TaskOrchestrator extends EventEmitter {
 
     const allFiles = [...new Set(run.plan.subtasks.flatMap((s) => s.filesTouched))];
 
+    const engineerSummary = engineerResults
+      .map((r) => `- Subtask ${r.subtaskId}: ${r.summary}`)
+      .join('\n');
+
     const memTask =
-      `A coding task has been completed. Update the memory bank.\n\n` +
+      `A coding task has been completed and verified. Update the memory bank.\n\n` +
       `Task: ${run.prompt}\n\n` +
       `Files changed:\n${allFiles.map((f) => `- ${f}`).join('\n') || '(none)'}\n\n` +
-      `Rework cycles: ${run.reworkCycles}\n` +
-      `Outcome: completed successfully`;
+      `Engineer results:\n${engineerSummary}\n\n` +
+      `Reviewer verdict: PASSED\n` +
+      `Rework cycles used: ${run.reworkCycles}\n\n` +
+      `Only promote patterns that were part of the final passing implementation.`;
 
     await memoryManager.run({ task: memTask, signal });
     run.agentStates['memory-manager'] = memoryManager.state;
@@ -427,10 +486,11 @@ export class TaskOrchestrator extends EventEmitter {
       const subtasks: Subtask[] = rawSubtasks.map(
         (s: Record<string, unknown>, i: number): Subtask => ({
           id: String(s['id'] ?? `subtask-${i + 1}`),
-          description: String(s['description'] ?? ''),
+          description: buildSubtaskDescription(s),
           assignedTo: null,
           status: 'pending',
           filesTouched: [],
+          dependsOn: Array.isArray(s['dependsOn']) ? s['dependsOn'].map(String) : [],
         }),
       );
 
@@ -484,6 +544,7 @@ interface EngineerResult {
   subtaskId: string;
   summary: string;
   filesChanged: string[];
+  interrupted?: boolean;
 }
 
 /**
@@ -509,14 +570,29 @@ function extractFilesTouched(log: AgentLogEntry[]): string[] {
 
 /**
  * Parse the reviewer agent's done summary into a ReviewResult.
- * Falls back to "passed" if parsing fails (lenient — user can always re-run).
+ * Handles both the legacy flat-string issues format and the new evidence-backed
+ * format where each issue is {description, evidence}. Falls back to "passed"
+ * if parsing fails (lenient — user can always re-run).
  */
 function parseReviewResult(summary: string): ReviewResult {
   try {
     const parsed = JSON.parse(summary) as Record<string, unknown>;
+
+    const rawIssues = Array.isArray(parsed['issues']) ? parsed['issues'] : [];
+    const issues = rawIssues.map((issue: unknown): string => {
+      if (typeof issue === 'string') return issue;
+      if (typeof issue === 'object' && issue !== null) {
+        const i = issue as Record<string, unknown>;
+        const desc = String(i['description'] ?? '');
+        const evidence = typeof i['evidence'] === 'string' ? ` (evidence: ${i['evidence']})` : '';
+        return `${desc}${evidence}`;
+      }
+      return String(issue);
+    });
+
     return {
       passed: Boolean(parsed['passed']),
-      issues: Array.isArray(parsed['issues']) ? parsed['issues'].map(String) : [],
+      issues,
       notes: String(parsed['notes'] ?? ''),
     };
   } catch {
@@ -532,6 +608,44 @@ function fallbackSubtasks(prompt: string): Subtask[] {
       assignedTo: null,
       status: 'pending',
       filesTouched: [],
+      dependsOn: [],
     },
   ];
+}
+
+/**
+ * Build a full subtask description from the Team Lead's structured subtask JSON.
+ * Appends successCriteria and constraints as explicit sections so the engineer
+ * receives them as part of the task description rather than as separate fields
+ * that could be ignored.
+ */
+function buildSubtaskDescription(s: Record<string, unknown>): string {
+  let desc = String(s['description'] ?? '');
+
+  const criteria = Array.isArray(s['successCriteria']) ? s['successCriteria'].map(String) : [];
+  if (criteria.length > 0) {
+    desc += `\n\nSuccess criteria (your done signal must satisfy all of these):\n` +
+      criteria.map((c) => `- ${c}`).join('\n');
+  }
+
+  const constraints = Array.isArray(s['constraints']) ? s['constraints'].map(String) : [];
+  if (constraints.length > 0) {
+    desc += `\n\nConstraints (hard requirements — do not violate):\n` +
+      constraints.map((c) => `- ${c}`).join('\n');
+  }
+
+  return desc;
+}
+
+/**
+ * Check whether an engineer's done signal summary indicates a blocked/stuck state.
+ * Engineers signal this by setting confidence to "blocked" in their typed done JSON.
+ */
+function isBlockedEngineer(summary: string): boolean {
+  try {
+    const parsed = JSON.parse(summary) as Record<string, unknown>;
+    return parsed['confidence'] === 'blocked';
+  } catch {
+    return false;
+  }
 }
