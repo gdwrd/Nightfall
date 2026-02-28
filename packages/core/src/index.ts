@@ -12,3 +12,24 @@ export { initializeMemoryBank } from './memory/memory.init.js';
 export { LockRegistry } from './locks/lock.registry.js';
 export type { LockRegistryOptions } from './locks/lock.registry.js';
 export { SnapshotManager } from './snapshots/snapshot.manager.js';
+// Phase 8 — Agent Tool System
+export { ToolRegistry } from './tools/tool.registry.js';
+export { ToolNotAllowedError } from './tools/tool.types.js';
+export type {
+  ToolDefinition,
+  ToolCall,
+  ToolResult,
+  ToolContext,
+  ToolImpl,
+  ToolParameter,
+} from './tools/tool.types.js';
+export { readMemoryTool } from './tools/tools/read_memory.js';
+export { readFileTool } from './tools/tools/read_file.js';
+export { writeDiffTool, setLockRegistry } from './tools/tools/write_diff.js';
+export { runCommandTool, setRunCommandAbortSignal } from './tools/tools/run_command.js';
+export { assignTaskTool, setAssignTaskBus } from './tools/tools/assign_task.js';
+export type { AssignTaskMessage } from './tools/tools/assign_task.js';
+export { requestReviewTool, setRequestReviewBus } from './tools/tools/request_review.js';
+export type { RequestReviewMessage } from './tools/tools/request_review.js';
+export { writeMemoryTool } from './tools/tools/write_memory.js';
+export { updateIndexTool } from './tools/tools/update_index.js';

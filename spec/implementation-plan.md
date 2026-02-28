@@ -15,16 +15,16 @@
 
 ## Phase Overview
 
-| # | Phase | Package | Depends On |
-|---|---|---|---|
-| 1 | Monorepo Scaffold | root | — |
-| 2 | Shared Types | `shared` | 1 |
-| 3 | Config & Ollama Lifecycle | `core` | 2 |
-| 4 | Provider Adapter Layer | `core` | 3 |
-| 5 | Memory Bank | `core` | 2, 3 |
-| 6 | File Lock Registry | `core` | 2 |
-| 7 | Snapshot & Rollback | `core` | 2, 3 |
-| 8 | Agent Tool System | `core` | 4, 5, 6, 7 |
+| # | Phase | Package | Depends On | Status |
+|---|---|---|---|---|
+| 1 | Monorepo Scaffold | root | — | ✅ Done |
+| 2 | Shared Types | `shared` | 1 | ✅ Done |
+| 3 | Config & Ollama Lifecycle | `core` | 2 | ✅ Done |
+| 4 | Provider Adapter Layer | `core` | 3 | ✅ Done |
+| 5 | Memory Bank | `core` | 2, 3 | ✅ Done |
+| 6 | File Lock Registry | `core` | 2 | ✅ Done |
+| 7 | Snapshot & Rollback | `core` | 2, 3 | ✅ Done |
+| 8 | Agent Tool System | `core` | 4, 5, 6, 7 | 🚧 In Progress |
 | 9 | Agent Prompts | `core` | 8 |
 | 10 | Agent Runner | `core` | 4, 8, 9 |
 | 11 | Task Orchestrator | `core` | 6, 7, 10 |
