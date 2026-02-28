@@ -32,6 +32,7 @@ await build({
     'react/*',
     'ws',
     'ollama',
+    'openai',
     'js-yaml',
     'diff',
   ],
