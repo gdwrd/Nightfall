@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Box, Text, useApp, useInput } from 'ink';
 import type { NightfallConfig, TaskRun, AgentState, FileLock } from '@nightfall/shared';
 import type { OllamaLifecycleEvent } from '@nightfall/shared';
@@ -12,7 +12,8 @@ import { PlanReview } from './PlanReview.js';
 import { InputBar } from './InputBar.js';
 import type { InputMode } from './InputBar.js';
 import { editPlanInEditor } from './PlanEditor.js';
-import { handleSlashCommand } from '../slash.commands.js';
+import { SlashOutput } from './SlashOutput.js';
+import { SlashAutocomplete } from './SlashAutocomplete.js';
 import { useAppStore } from '../store/app.store.js';
 
 // ---------------------------------------------------------------------------
@@ -32,7 +33,8 @@ interface AppProps {
 export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) => {
   const { exit } = useApp();
   const [state, dispatch] = useAppStore();
-  const { phase, lifecycleEvent, activeRun, agentStates, locks, messages, errorMessage } = state;
+  const { phase, lifecycleEvent, activeRun, agentStates, locks, messages, errorMessage, slashOutput } = state;
+  const [inputValue, setInputValue] = useState('');
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
@@ -70,6 +72,17 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) =
     };
   }, [orchestrator, dispatch]);
 
+  // ── Slash command result wiring ────────────────────────────────────────────
+  useEffect(() => {
+    const onSlashResult = (payload: { command: string; output: string }) => {
+      dispatch({ type: 'SET_SLASH_OUTPUT', output: payload.output });
+    };
+    orchestrator.on('slash:result', onSlashResult);
+    return () => {
+      orchestrator.off('slash:result', onSlashResult);
+    };
+  }, [orchestrator, dispatch]);
+
   // ── Keyboard: Ctrl+C ───────────────────────────────────────────────────────
   useInput((input, key) => {
     if (key.ctrl && input === 'c') {
@@ -82,26 +95,35 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) =
   });
 
   // ── Input handler ──────────────────────────────────────────────────────────
-  const handleInput = async (input: string) => {
+  const handleInput = (input: string) => {
     const addMessage = (msg: string) => dispatch({ type: 'ADD_MESSAGE', message: msg });
 
     // Slash commands
     if (input.startsWith('/')) {
-      const result = await handleSlashCommand(input, {
-        config,
-        orchestrator,
-        projectRoot,
-        addMessage,
-      });
-      if (result === 'exit') {
+      const lower = input.trim().toLowerCase();
+
+      // Handle exit locally — no server round-trip needed
+      if (lower === '/exit' || lower === '/quit') {
         exit();
         return;
       }
-      if (result === '[clear]') {
+
+      // Handle clear locally — resets CLI state only
+      if (lower === '/clear') {
         dispatch({ type: 'CLEAR_MESSAGES' });
+        dispatch({ type: 'SET_SLASH_OUTPUT', output: null });
         return;
       }
-      if (result) addMessage(result);
+
+      // Clear any stale slash output before sending the new command
+      dispatch({ type: 'SET_SLASH_OUTPUT', output: null });
+
+      // Parse command and optional args
+      const [cmd = '', ...rest] = input.trim().split(/\s+/);
+      const args = rest.join(' ');
+
+      // Route to server — result arrives via 'slash:result' event
+      orchestrator.sendSlashCommand(cmd, args);
       return;
     }
 
@@ -228,9 +250,16 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, projectRoot }) =
         </Box>
       )}
 
+      {/* Slash command output */}
+      {slashOutput !== null && slashOutput !== '' && <SlashOutput output={slashOutput} />}
+
+      {/* Slash autocomplete — shown above the input bar while typing */}
+      <SlashAutocomplete input={inputValue} />
+
       <InputBar
         mode={inputMode}
         onSubmit={handleInput}
+        onValueChange={setInputValue}
         completionMessage={messages[messages.length - 1]}
       />
     </Box>
