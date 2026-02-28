@@ -16,6 +16,8 @@ export const SLASH_COMMANDS: Record<string, string> = {
   '/clear': 'Clear message log',
   '/help': 'Show all available commands',
   '/compact': 'Compress conversation history (future feature)',
+  '/model': 'Pick active model for current provider',
+  '/settings': 'Edit all configuration settings',
 };
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 import { useReducer } from 'react';
-import type { TaskRun, AgentState, FileLock, ProviderLifecycleEvent, SnapshotMeta } from '@nightfall/shared';
+import type { TaskRun, AgentState, FileLock, ProviderLifecycleEvent, SnapshotMeta, NightfallConfig } from '@nightfall/shared';
 import type { AppAction } from './app.actions.js';
 
 // ---------------------------------------------------------------------------
@@ -18,7 +18,25 @@ export type AppPhase =
   | 'completed' // Task finished
   | 'error' // Fatal error
   | 'history_view' // Browsing task history
-  | 'rollback_confirm'; // Awaiting rollback cascade confirmation
+  | 'rollback_confirm' // Awaiting rollback cascade confirmation
+  | 'model_view' // Picking an LLM model
+  | 'settings_view'; // Editing configuration
+
+export interface ModelEntry {
+  id: string;
+  label: string;
+  contextLength?: number;
+}
+
+export interface ModelViewData {
+  provider: string;
+  currentModel: string;
+  models: ModelEntry[];
+}
+
+export interface SettingsViewData {
+  config: NightfallConfig;
+}
 
 export interface AppState {
   phase: AppPhase;
@@ -34,6 +52,8 @@ export interface AppState {
   rollbackChain: SnapshotMeta[];
   pendingRollbackSnapshotId: string | null;
   contextLength: number | null;
+  modelViewData: ModelViewData | null;
+  settingsViewData: SettingsViewData | null;
 }
 
 const initialState: AppState = {
@@ -50,6 +70,8 @@ const initialState: AppState = {
   rollbackChain: [],
   pendingRollbackSnapshotId: null,
   contextLength: null,
+  modelViewData: null,
+  settingsViewData: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -166,6 +188,12 @@ function reducer(state: AppState, action: AppAction): AppState {
         rollbackChain: action.chain,
         pendingRollbackSnapshotId: action.snapshotId,
       };
+
+    case 'SET_MODEL_VIEW':
+      return { ...state, phase: 'model_view', modelViewData: action.data };
+
+    case 'SET_SETTINGS_VIEW':
+      return { ...state, phase: 'settings_view', settingsViewData: action.data };
 
     default:
       return state;

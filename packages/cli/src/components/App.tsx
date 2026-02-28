@@ -18,7 +18,10 @@ import { SlashAutocomplete } from './SlashAutocomplete.js';
 import { HistoryView } from './HistoryView.js';
 import { RollbackConfirm } from './RollbackConfirm.js';
 import { ThinkingPanel } from './ThinkingPanel.js';
+import { ModelView } from './ModelView.js';
+import { SettingsView } from './SettingsView.js';
 import { useAppStore } from '../store/app.store.js';
+import type { ModelViewData } from '../store/app.store.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -53,6 +56,8 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
     rollbackChain,
     pendingRollbackSnapshotId,
     contextLength,
+    modelViewData,
+    settingsViewData,
   } = state;
   const [inputValue, setInputValue] = useState('');
   const [awaitingInitConfirm, setAwaitingInitConfirm] = useState(false);
@@ -143,6 +148,55 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
           // Not JSON — fall through to plain text output
         }
       }
+
+      if (payload.command === '/model' || payload.command === '/settings') {
+        try {
+          const data = JSON.parse(payload.output) as { type: string; [key: string]: unknown };
+
+          if (data.type === 'model_view') {
+            dispatch({
+              type: 'SET_MODEL_VIEW',
+              data: data as unknown as ModelViewData,
+            });
+            return;
+          }
+
+          if (data.type === 'settings_view') {
+            dispatch({
+              type: 'SET_SETTINGS_VIEW',
+              data: { config: data.config as NightfallConfig },
+            });
+            return;
+          }
+
+          if (data.type === 'model_saved') {
+            dispatch({
+              type: 'SET_SLASH_OUTPUT',
+              output: `✓ Model changed to ${String(data.model)}. Restart to apply.`,
+            });
+            dispatch({ type: 'SET_PHASE', phase: 'idle' });
+            return;
+          }
+
+          if (data.type === 'settings_saved') {
+            dispatch({
+              type: 'SET_SLASH_OUTPUT',
+              output: '✓ Settings saved. Restart Nightfall to apply changes.',
+            });
+            dispatch({ type: 'SET_PHASE', phase: 'idle' });
+            return;
+          }
+
+          if (data.type === 'error') {
+            dispatch({ type: 'SET_SLASH_OUTPUT', output: `Error: ${String(data.message)}` });
+            dispatch({ type: 'SET_PHASE', phase: 'idle' });
+            return;
+          }
+        } catch {
+          // Not JSON — fall through to plain text output
+        }
+      }
+
       dispatch({ type: 'SET_SLASH_OUTPUT', output: payload.output });
     };
     orchestrator.on('slash:result', onSlashResult);
@@ -203,6 +257,11 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
       // Parse command and optional args
       const [cmd = '', ...rest] = input.trim().split(/\s+/);
       const args = rest.join(' ');
+
+      // Show a loading hint for commands that may take a moment
+      if (cmd === '/model') {
+        dispatch({ type: 'SET_SLASH_OUTPUT', output: 'Fetching available models...' });
+      }
 
       // Route to server — result arrives via 'slash:result' event
       orchestrator.sendSlashCommand(cmd, args);
@@ -343,6 +402,40 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
         }}
         onCancel={() => {
           dispatch({ type: 'SET_PHASE', phase: 'history_view' });
+        }}
+      />
+    );
+  }
+
+  // Model picker
+  if (phase === 'model_view' && modelViewData) {
+    return (
+      <ModelView
+        provider={modelViewData.provider}
+        currentModel={modelViewData.currentModel}
+        models={modelViewData.models}
+        onSelect={(modelId) => {
+          orchestrator.sendSlashCommand('/model', `select ${modelId}`);
+        }}
+        onExit={() => {
+          dispatch({ type: 'SET_PHASE', phase: 'idle' });
+          dispatch({ type: 'SET_SLASH_OUTPUT', output: null });
+        }}
+      />
+    );
+  }
+
+  // Settings editor
+  if (phase === 'settings_view' && settingsViewData) {
+    return (
+      <SettingsView
+        initialConfig={settingsViewData.config}
+        onSave={(newConfig) => {
+          orchestrator.sendSlashCommand('/settings', `save ${JSON.stringify(newConfig)}`);
+        }}
+        onExit={() => {
+          dispatch({ type: 'SET_PHASE', phase: 'idle' });
+          dispatch({ type: 'SET_SLASH_OUTPUT', output: null });
         }}
       />
     );

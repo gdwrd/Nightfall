@@ -75,6 +75,14 @@ function validateConfig(config: NightfallConfig): void {
   }
 }
 
+export function writeConfig(config: NightfallConfig): void {
+  validateConfig(config);
+  if (!fs.existsSync(NIGHTFALL_DIR)) {
+    fs.mkdirSync(NIGHTFALL_DIR, { recursive: true });
+  }
+  fs.writeFileSync(CONFIG_PATH, yaml.dump(config as unknown as Record<string, unknown>), 'utf8');
+}
+
 export async function loadConfig(): Promise<NightfallConfig> {
   // Ensure ~/.nightfall/ exists
   if (!fs.existsSync(NIGHTFALL_DIR)) {
