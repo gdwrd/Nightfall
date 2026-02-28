@@ -1,5 +1,5 @@
 import { Ollama } from 'ollama';
-import type { NightfallConfig, ProviderAdapter } from '@nightfall/shared';
+import type { NightfallConfig, ProviderAdapter, ChatMessage } from '@nightfall/shared';
 import { isOllamaRunning, isModelAvailable, pullModel } from '../../ollama/ollama.lifecycle.js';
 
 export class OllamaAdapter implements ProviderAdapter {
@@ -13,21 +13,14 @@ export class OllamaAdapter implements ProviderAdapter {
     });
   }
 
-  async *complete(
-    prompt: string,
-    systemPrompt: string,
-    signal?: AbortSignal,
-  ): AsyncGenerator<string> {
+  async *complete(messages: ChatMessage[], signal?: AbortSignal): AsyncGenerator<string> {
     if (signal?.aborted) {
       return;
     }
 
     const stream = await this.client.chat({
       model: this.config.provider.model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: prompt },
-      ],
+      messages: messages.map((m) => ({ role: m.role, content: m.content })),
       stream: true,
     });
 

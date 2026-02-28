@@ -12,6 +12,12 @@ export { initializeMemoryBank } from './memory/memory.init.js';
 export { LockRegistry } from './locks/lock.registry.js';
 export type { LockRegistryOptions } from './locks/lock.registry.js';
 export { SnapshotManager } from './snapshots/snapshot.manager.js';
+// Phase 9 — Agent Base Class
+export { BaseAgent } from './agents/agent.base.js';
+export type { AgentConfig, AgentRunOptions, AgentRunResult } from './agents/agent.base.js';
+export { parseToolCall, parseDone } from './agents/agent.parser.js';
+export type { DoneSignal } from './agents/agent.parser.js';
+export { buildSystemPrompt, buildToolsDescription } from './agents/agent.prompts.js';
 // Phase 8 — Agent Tool System
 export { ToolRegistry } from './tools/tool.registry.js';
 export { ToolNotAllowedError } from './tools/tool.types.js';
