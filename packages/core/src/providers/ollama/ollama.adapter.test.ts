@@ -1,15 +1,15 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import http from 'node:http'
-import type { NightfallConfig } from '@nightfall/shared'
-import { OllamaAdapter } from './ollama.adapter.js'
-import { createProvider } from '../provider.factory.js'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import http from 'node:http';
+import type { NightfallConfig } from '@nightfall/shared';
+import { OllamaAdapter } from './ollama.adapter.js';
+import { createProvider } from '../provider.factory.js';
 
 // ---------------------------------------------------------------------------
 // Mock Ollama server
 // ---------------------------------------------------------------------------
 
-let server: http.Server
-let serverPort: number
+let server: http.Server;
+let serverPort: number;
 
 function buildChatChunk(content: string, done: boolean) {
   return JSON.stringify({
@@ -28,7 +28,7 @@ function buildChatChunk(content: string, done: boolean) {
           eval_duration: 30,
         }
       : {}),
-  })
+  });
 }
 
 function startMockServer(): Promise<void> {
@@ -36,73 +36,73 @@ function startMockServer(): Promise<void> {
     server = http.createServer((req, res) => {
       // Health check — Ollama root endpoint
       if (req.url === '/' && req.method === 'GET') {
-        res.writeHead(200)
-        res.end('Ollama is running')
-        return
+        res.writeHead(200);
+        res.end('Ollama is running');
+        return;
       }
 
       // Model list — /api/tags
       if (req.url === '/api/tags' && req.method === 'GET') {
-        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(
           JSON.stringify({
             models: [{ name: 'test-model:latest' }],
           }),
-        )
-        return
+        );
+        return;
       }
 
       // Chat endpoint — /api/chat
       if (req.url === '/api/chat' && req.method === 'POST') {
-        let body = ''
+        let body = '';
         req.on('data', (chunk: Buffer) => {
-          body += chunk.toString()
-        })
+          body += chunk.toString();
+        });
         req.on('end', () => {
-          const parsed = JSON.parse(body) as { stream?: boolean }
+          const parsed = JSON.parse(body) as { stream?: boolean };
 
           if (parsed.stream) {
-            res.writeHead(200, { 'Content-Type': 'application/x-ndjson' })
+            res.writeHead(200, { 'Content-Type': 'application/x-ndjson' });
 
-            const tokens = ['Hello', ' from', ' Ollama', '!']
-            let i = 0
+            const tokens = ['Hello', ' from', ' Ollama', '!'];
+            let i = 0;
 
             const interval = setInterval(() => {
               if (res.destroyed) {
-                clearInterval(interval)
-                return
+                clearInterval(interval);
+                return;
               }
 
               if (i < tokens.length) {
-                const isLast = i === tokens.length - 1
-                res.write(buildChatChunk(tokens[i], isLast) + '\n')
-                i++
+                const isLast = i === tokens.length - 1;
+                res.write(buildChatChunk(tokens[i], isLast) + '\n');
+                i++;
               } else {
-                clearInterval(interval)
-                res.end()
+                clearInterval(interval);
+                res.end();
               }
-            }, 30)
+            }, 30);
 
             // Clean up if client disconnects
-            res.on('close', () => clearInterval(interval))
+            res.on('close', () => clearInterval(interval));
           } else {
-            res.writeHead(200, { 'Content-Type': 'application/json' })
-            res.end(buildChatChunk('Hello from Ollama!', true))
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(buildChatChunk('Hello from Ollama!', true));
           }
-        })
-        return
+        });
+        return;
       }
 
-      res.writeHead(404)
-      res.end()
-    })
+      res.writeHead(404);
+      res.end();
+    });
 
     server.listen(0, '127.0.0.1', () => {
-      const addr = server.address()
-      serverPort = typeof addr === 'object' && addr !== null ? addr.port : 0
-      resolve()
-    })
-  })
+      const addr = server.address();
+      serverPort = typeof addr === 'object' && addr !== null ? addr.port : 0;
+      resolve();
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -121,7 +121,7 @@ function makeConfig(overrides: Partial<NightfallConfig['provider']> = {}): Night
     concurrency: { max_engineers: 3 },
     task: { max_rework_cycles: 3 },
     logs: { retention: 50 },
-  }
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -129,82 +129,92 @@ function makeConfig(overrides: Partial<NightfallConfig['provider']> = {}): Night
 // ---------------------------------------------------------------------------
 
 beforeAll(async () => {
-  await startMockServer()
-})
+  await startMockServer();
+});
 
 afterAll(() => {
-  server.close()
-})
+  server.close();
+});
 
 describe('OllamaAdapter', () => {
   it('streams tokens incrementally via complete()', async () => {
-    const adapter = new OllamaAdapter(makeConfig())
-    const chunks: string[] = []
+    const adapter = new OllamaAdapter(makeConfig());
+    const chunks: string[] = [];
 
     for await (const token of adapter.complete('Say hello', 'You are helpful.')) {
-      chunks.push(token)
+      chunks.push(token);
     }
 
-    expect(chunks.length).toBeGreaterThan(1)
-    expect(chunks.join('')).toBe('Hello from Ollama!')
-  })
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.join('')).toBe('Hello from Ollama!');
+  });
 
   it('respects an already-aborted signal', async () => {
-    const adapter = new OllamaAdapter(makeConfig())
-    const controller = new AbortController()
-    controller.abort()
+    const adapter = new OllamaAdapter(makeConfig());
+    const controller = new AbortController();
+    controller.abort();
 
-    const chunks: string[] = []
-    for await (const token of adapter.complete('Say hello', 'You are helpful.', controller.signal)) {
-      chunks.push(token)
+    const chunks: string[] = [];
+    for await (const token of adapter.complete(
+      'Say hello',
+      'You are helpful.',
+      controller.signal,
+    )) {
+      chunks.push(token);
     }
 
-    expect(chunks).toEqual([])
-  })
+    expect(chunks).toEqual([]);
+  });
 
   it('stops streaming when abort signal fires mid-stream', async () => {
-    const adapter = new OllamaAdapter(makeConfig())
-    const controller = new AbortController()
-    const chunks: string[] = []
+    const adapter = new OllamaAdapter(makeConfig());
+    const controller = new AbortController();
+    const chunks: string[] = [];
 
-    for await (const token of adapter.complete('Say hello', 'You are helpful.', controller.signal)) {
-      chunks.push(token)
+    for await (const token of adapter.complete(
+      'Say hello',
+      'You are helpful.',
+      controller.signal,
+    )) {
+      chunks.push(token);
       // Abort after collecting the first token
       if (chunks.length === 1) {
-        controller.abort()
+        controller.abort();
       }
     }
 
     // Should have collected at most 1-2 tokens before abort took effect
-    expect(chunks.length).toBeLessThanOrEqual(2)
-  })
+    expect(chunks.length).toBeLessThanOrEqual(2);
+  });
 
   it('isAvailable() returns true when server is running', async () => {
-    const adapter = new OllamaAdapter(makeConfig())
-    const available = await adapter.isAvailable()
-    expect(available).toBe(true)
-  })
+    const adapter = new OllamaAdapter(makeConfig());
+    const available = await adapter.isAvailable();
+    expect(available).toBe(true);
+  });
 
   it('isAvailable() returns false for unreachable server', async () => {
-    const adapter = new OllamaAdapter(makeConfig({ port: 19999 }))
-    const available = await adapter.isAvailable()
-    expect(available).toBe(false)
-  })
+    const adapter = new OllamaAdapter(makeConfig({ port: 19999 }));
+    const available = await adapter.isAvailable();
+    expect(available).toBe(false);
+  });
 
   it('ensureModelReady() succeeds when model is already available', async () => {
-    const adapter = new OllamaAdapter(makeConfig())
+    const adapter = new OllamaAdapter(makeConfig());
     // test-model:latest is listed by the mock /api/tags endpoint
-    await expect(adapter.ensureModelReady('test-model')).resolves.toBeUndefined()
-  })
-})
+    await expect(adapter.ensureModelReady('test-model')).resolves.toBeUndefined();
+  });
+});
 
 describe('createProvider', () => {
   it('returns an OllamaAdapter for provider name "ollama"', () => {
-    const provider = createProvider(makeConfig())
-    expect(provider).toBeInstanceOf(OllamaAdapter)
-  })
+    const provider = createProvider(makeConfig());
+    expect(provider).toBeInstanceOf(OllamaAdapter);
+  });
 
   it('throws on unknown provider name', () => {
-    expect(() => createProvider(makeConfig({ name: 'openai' }))).toThrow('Unknown provider: openai')
-  })
-})
+    expect(() => createProvider(makeConfig({ name: 'openai' }))).toThrow(
+      'Unknown provider: openai',
+    );
+  });
+});

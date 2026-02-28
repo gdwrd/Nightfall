@@ -1,16 +1,16 @@
-import { Ollama } from 'ollama'
-import type { NightfallConfig, ProviderAdapter } from '@nightfall/shared'
-import { isOllamaRunning, isModelAvailable, pullModel } from '../../ollama/ollama.lifecycle.js'
+import { Ollama } from 'ollama';
+import type { NightfallConfig, ProviderAdapter } from '@nightfall/shared';
+import { isOllamaRunning, isModelAvailable, pullModel } from '../../ollama/ollama.lifecycle.js';
 
 export class OllamaAdapter implements ProviderAdapter {
-  private readonly client: Ollama
-  private readonly config: NightfallConfig
+  private readonly client: Ollama;
+  private readonly config: NightfallConfig;
 
   constructor(config: NightfallConfig) {
-    this.config = config
+    this.config = config;
     this.client = new Ollama({
       host: `http://${config.provider.host}:${config.provider.port}`,
-    })
+    });
   }
 
   async *complete(
@@ -19,7 +19,7 @@ export class OllamaAdapter implements ProviderAdapter {
     signal?: AbortSignal,
   ): AsyncGenerator<string> {
     if (signal?.aborted) {
-      return
+      return;
     }
 
     const stream = await this.client.chat({
@@ -29,41 +29,41 @@ export class OllamaAdapter implements ProviderAdapter {
         { role: 'user', content: prompt },
       ],
       stream: true,
-    })
+    });
 
     // Wire the AbortSignal to the ollama stream's abort mechanism
-    const onAbort = () => stream.abort()
-    signal?.addEventListener('abort', onAbort, { once: true })
+    const onAbort = () => stream.abort();
+    signal?.addEventListener('abort', onAbort, { once: true });
 
     try {
       for await (const chunk of stream) {
         if (signal?.aborted) {
-          return
+          return;
         }
         if (chunk.message?.content) {
-          yield chunk.message.content
+          yield chunk.message.content;
         }
       }
     } catch (err: unknown) {
       // stream.abort() throws an AbortError — swallow it when we triggered it
       if (signal?.aborted) {
-        return
+        return;
       }
-      throw err
+      throw err;
     } finally {
-      signal?.removeEventListener('abort', onAbort)
+      signal?.removeEventListener('abort', onAbort);
     }
   }
 
   async isAvailable(): Promise<boolean> {
-    return isOllamaRunning(this.config.provider.host, this.config.provider.port)
+    return isOllamaRunning(this.config.provider.host, this.config.provider.port);
   }
 
   async ensureModelReady(model: string): Promise<void> {
-    const { host, port } = this.config.provider
-    const available = await isModelAvailable(host, port, model)
+    const { host, port } = this.config.provider;
+    const available = await isModelAvailable(host, port, model);
     if (!available) {
-      await pullModel(host, port, model, () => {})
+      await pullModel(host, port, model, () => {});
     }
   }
 }

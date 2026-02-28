@@ -1,1 +1,1 @@
-export type { ProviderAdapter } from '@nightfall/shared'
+export type { ProviderAdapter } from '@nightfall/shared';
