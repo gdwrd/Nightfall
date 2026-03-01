@@ -363,10 +363,10 @@ Update `NightfallServer` where it creates the `CommandDispatcherContext` to pass
 
 ### Task 3: CLI State & Actions
 
-- [ ] Add `new_project` to `AppPhase` type and `NewProjectWizardData` interface to `app.store.ts`
-- [ ] Add `SET_NEW_PROJECT`, `UPDATE_NEW_PROJECT`, `CLEAR_NEW_PROJECT` reducer cases
-- [ ] Add new action types to `app.actions.ts`
-- [ ] All tests and lint pass
+- [x] Add `new_project` to `AppPhase` type and `NewProjectWizardData` interface to `app.store.ts`
+- [x] Add `SET_NEW_PROJECT`, `UPDATE_NEW_PROJECT`, `CLEAR_NEW_PROJECT` reducer cases
+- [x] Add new action types to `app.actions.ts`
+- [x] All tests and lint pass
 
 ### Files to Modify
 

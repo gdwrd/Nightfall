@@ -20,7 +20,8 @@ export type AppPhase =
   | 'history_view' // Browsing task history
   | 'rollback_confirm' // Awaiting rollback cascade confirmation
   | 'model_view' // Picking an LLM model
-  | 'settings_view'; // Editing configuration
+  | 'settings_view' // Editing configuration
+  | 'new_project'; // New project wizard active
 
 export interface ModelEntry {
   id: string;
@@ -36,6 +37,14 @@ export interface ModelViewData {
 
 export interface SettingsViewData {
   config: NightfallConfig;
+}
+
+export interface NewProjectWizardData {
+  sessionId: string;
+  status: 'asking_idea' | 'gathering' | 'compiling_spec' | 'asking_plan' | 'compiling_plan';
+  currentQuestion: string | null;
+  questionNumber: number;
+  history: { role: 'user' | 'assistant'; content: string }[];
 }
 
 export interface AppState {
@@ -54,6 +63,7 @@ export interface AppState {
   contextLength: number | null;
   modelViewData: ModelViewData | null;
   settingsViewData: SettingsViewData | null;
+  newProjectData: NewProjectWizardData | null;
 }
 
 const initialState: AppState = {
@@ -72,6 +82,7 @@ const initialState: AppState = {
   contextLength: null,
   modelViewData: null,
   settingsViewData: null,
+  newProjectData: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -194,6 +205,20 @@ function reducer(state: AppState, action: AppAction): AppState {
 
     case 'SET_SETTINGS_VIEW':
       return { ...state, phase: 'settings_view', settingsViewData: action.data };
+
+    case 'SET_NEW_PROJECT':
+      return { ...state, phase: 'new_project', newProjectData: action.data };
+
+    case 'UPDATE_NEW_PROJECT':
+      return {
+        ...state,
+        newProjectData: state.newProjectData
+          ? { ...state.newProjectData, ...action.partial }
+          : null,
+      };
+
+    case 'CLEAR_NEW_PROJECT':
+      return { ...state, phase: 'idle', newProjectData: null };
 
     default:
       return state;

@@ -6,7 +6,7 @@ import type {
   ProviderLifecycleEvent,
   SnapshotMeta,
 } from '@nightfall/shared';
-import type { AppPhase, ModelViewData, SettingsViewData } from './app.store.js';
+import type { AppPhase, ModelViewData, SettingsViewData, NewProjectWizardData } from './app.store.js';
 
 // ---------------------------------------------------------------------------
 // Action Types
@@ -26,4 +26,7 @@ export type AppAction =
   | { type: 'SET_HISTORY_DATA'; runs: TaskRun[]; snapshots: SnapshotMeta[] }
   | { type: 'SET_ROLLBACK_CHAIN'; chain: SnapshotMeta[]; snapshotId: string }
   | { type: 'SET_MODEL_VIEW'; data: ModelViewData }
-  | { type: 'SET_SETTINGS_VIEW'; data: SettingsViewData };
+  | { type: 'SET_SETTINGS_VIEW'; data: SettingsViewData }
+  | { type: 'SET_NEW_PROJECT'; data: NewProjectWizardData }
+  | { type: 'UPDATE_NEW_PROJECT'; partial: Partial<NewProjectWizardData> }
+  | { type: 'CLEAR_NEW_PROJECT' };
