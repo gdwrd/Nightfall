@@ -19,6 +19,7 @@ export interface NewProjectSession {
   specPath: string | null;
   planPath: string | null;
   projectSlug: string | null;
+  createdAt: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -53,6 +54,9 @@ export function deriveSlug(idea: string): string {
 /** Maximum questions before auto-triggering spec compilation. */
 export const MAX_QUESTIONS = 20;
 
+/** Session TTL in milliseconds (30 minutes). */
+const SESSION_TTL_MS = 30 * 60 * 1000;
+
 export class NewProjectSessionManager {
   private sessions = new Map<string, NewProjectSession>();
 
@@ -68,14 +72,20 @@ export class NewProjectSessionManager {
       specPath: null,
       planPath: null,
       projectSlug: deriveSlug(idea),
+      createdAt: Date.now(),
     };
     this.sessions.set(id, session);
     return session;
   }
 
-  /** Retrieve an existing session by ID. */
+  /** Retrieve an existing session by ID. Returns undefined for expired sessions. */
   get(sessionId: string): NewProjectSession | undefined {
-    return this.sessions.get(sessionId);
+    const session = this.sessions.get(sessionId);
+    if (session && this.isExpired(session)) {
+      this.sessions.delete(sessionId);
+      return undefined;
+    }
+    return session;
   }
 
   /** Remove a session (cleanup after completion or cancellation). */
@@ -83,13 +93,27 @@ export class NewProjectSessionManager {
     this.sessions.delete(sessionId);
   }
 
-  /** Check whether any session is currently active. */
+  /** Check whether any non-expired session is currently active. */
   hasActive(): boolean {
+    this.evictExpired();
     return this.sessions.size > 0;
   }
 
-  /** Return any active session (first in the map), or undefined if none. */
+  /** Return any active non-expired session, or undefined if none. */
   getAnyActive(): NewProjectSession | undefined {
+    this.evictExpired();
     return this.sessions.values().next().value;
+  }
+
+  private isExpired(session: NewProjectSession): boolean {
+    return Date.now() - session.createdAt > SESSION_TTL_MS;
+  }
+
+  private evictExpired(): void {
+    for (const [id, session] of this.sessions) {
+      if (this.isExpired(session)) {
+        this.sessions.delete(id);
+      }
+    }
   }
 }

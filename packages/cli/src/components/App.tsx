@@ -318,9 +318,11 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
         abortControllerRef.current?.abort();
       } else if (phase === 'new_project') {
         const sid = state.newProjectData?.sessionId;
-        if (sid) {
-          orchestrator.sendSlashCommand('/new-project', `cancel ${sid}`);
-        }
+        // Always send cancel — use bare `cancel` when sessionId is unknown
+        // (e.g. during the race between sending `start` and receiving the
+        // response). The server's handleCancel supports bare cancel via
+        // getAnyActive().
+        orchestrator.sendSlashCommand('/new-project', sid ? `cancel ${sid}` : 'cancel');
         dispatch({ type: 'CLEAR_NEW_PROJECT' });
       } else {
         exit();
