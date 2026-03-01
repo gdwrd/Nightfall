@@ -487,12 +487,12 @@ interface NewProjectWizardProps {
 
 ### Task 5: App.tsx Integration
 
-- [ ] Add slash result handling for `/new-project` in `App.tsx`
-- [ ] Add input handling for wizard mode in `App.tsx`
-- [ ] Add render section for the wizard component in `App.tsx`
-- [ ] Add `new_project` and `new_project_plan` input modes to `InputBar.tsx`
-- [ ] Register `/new-project` in `slash.commands.ts`
-- [ ] All tests and lint pass
+- [x] Add slash result handling for `/new-project` in `App.tsx`
+- [x] Add input handling for wizard mode in `App.tsx`
+- [x] Add render section for the wizard component in `App.tsx`
+- [x] Add `new_project` and `new_project_plan` input modes to `InputBar.tsx`
+- [x] Register `/new-project` in `slash.commands.ts`
+- [x] All tests and lint pass
 
 ### Files to Modify
 
