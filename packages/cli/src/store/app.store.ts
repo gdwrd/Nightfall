@@ -210,19 +210,13 @@ function reducer(state: AppState, action: AppAction): AppState {
       return { ...state, phase: 'new_project', newProjectData: action.data };
 
     case 'UPDATE_NEW_PROJECT':
+      // No-op when newProjectData is null — prevents stale slash:result
+      // events from re-opening the wizard after cancel.
+      if (!state.newProjectData) return state;
       return {
         ...state,
         phase: 'new_project',
-        newProjectData: state.newProjectData
-          ? { ...state.newProjectData, ...action.partial }
-          : {
-              sessionId: '',
-              status: 'gathering',
-              currentQuestion: null,
-              questionNumber: 0,
-              history: [],
-              ...action.partial,
-            },
+        newProjectData: { ...state.newProjectData, ...action.partial },
       };
 
     case 'APPEND_NEW_PROJECT_HISTORY':

@@ -223,19 +223,41 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
               return;
 
             case 'new_project_question':
-              dispatch({
-                type: 'UPDATE_NEW_PROJECT',
-                partial: {
-                  sessionId: data.sessionId as string,
-                  status: 'gathering',
-                  currentQuestion: data.question as string,
-                  questionNumber: data.questionNumber as number,
-                },
-              });
-              dispatch({
-                type: 'APPEND_NEW_PROJECT_HISTORY',
-                entry: { role: 'assistant' as const, content: data.question as string },
-              });
+              // Natural language trigger: `idea` field is present — set up
+              // fresh wizard state including the user's original prompt.
+              if (data.idea) {
+                dispatch({
+                  type: 'SET_NEW_PROJECT',
+                  data: {
+                    sessionId: data.sessionId as string,
+                    status: 'gathering',
+                    currentQuestion: data.question as string,
+                    questionNumber: data.questionNumber as number,
+                    history: [
+                      { role: 'assistant' as const, content: 'What would you like to build? Describe your idea.' },
+                      { role: 'user' as const, content: data.idea as string },
+                    ],
+                  },
+                });
+                dispatch({
+                  type: 'APPEND_NEW_PROJECT_HISTORY',
+                  entry: { role: 'assistant' as const, content: data.question as string },
+                });
+              } else {
+                dispatch({
+                  type: 'UPDATE_NEW_PROJECT',
+                  partial: {
+                    sessionId: data.sessionId as string,
+                    status: 'gathering',
+                    currentQuestion: data.question as string,
+                    questionNumber: data.questionNumber as number,
+                  },
+                });
+                dispatch({
+                  type: 'APPEND_NEW_PROJECT_HISTORY',
+                  entry: { role: 'assistant' as const, content: data.question as string },
+                });
+              }
               return;
 
             case 'new_project_gathering_complete':

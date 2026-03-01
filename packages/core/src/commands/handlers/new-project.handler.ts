@@ -79,12 +79,9 @@ async function handleAnswer(
 
   const provider = ctx.provider;
 
-  // Record the user's answer in history before the LLM call so it is
-  // preserved even if the provider throws.
-  session.history.push({ role: 'user', content: answer });
-  session.questionCount++;
-
-  // Build conversation messages for the LLM
+  // Build conversation messages including the new answer, but do NOT push
+  // to session.history yet — if the LLM call fails we don't want orphaned
+  // user entries that corrupt the alternating assistant/user pattern.
   const messages: ChatMessage[] = [
     { role: 'system', content: SPEC_BUILDER_SYSTEM_PROMPT },
     { role: 'user', content: `Here's the idea:\n\n${session.idea}` },
@@ -92,9 +89,21 @@ async function handleAnswer(
       role: h.role as ChatMessage['role'],
       content: h.content,
     })),
+    { role: 'user', content: answer },
   ];
 
-  const response = await collectResponse(provider, messages);
+  let response: string;
+  try {
+    response = await collectResponse(provider, messages);
+  } catch (err) {
+    // Clean up session so the user isn't permanently locked out of the wizard
+    sessionManager.delete(session.id);
+    throw err;
+  }
+
+  // Record only after successful LLM call
+  session.history.push({ role: 'user', content: answer });
+  session.questionCount++;
 
   // Record the LLM's response in history (strip sentinel if present)
   const cleanResponse = response.replace(/\[SPEC_READY\]/g, '').trim();
@@ -327,6 +336,12 @@ export async function newProjectHandler(
       }
       const sessionId = rest.slice(0, spaceIdx);
       const answer = rest.slice(spaceIdx + 1).trim();
+      if (!answer) {
+        return JSON.stringify({
+          type: 'new_project_error',
+          message: 'Answer cannot be empty.',
+        });
+      }
       return await handleAnswer(ctx, sessionId, answer);
     }
 

@@ -563,10 +563,24 @@ export class TaskOrchestrator extends EventEmitter {
 
     const output = await newProjectHandler(ctx, `start ${prompt}`);
 
+    // Augment the payload with the user's original prompt so the CLI can
+    // include it in the wizard history (the normal /new-project flow goes
+    // through asking_idea → start, but the NL trigger skips asking_idea).
+    let augmentedOutput = output;
+    try {
+      const parsed = JSON.parse(output) as Record<string, unknown>;
+      if (parsed['type'] === 'new_project_question') {
+        parsed['idea'] = prompt;
+        augmentedOutput = JSON.stringify(parsed);
+      }
+    } catch {
+      // Not JSON — use original output
+    }
+
     // Emit the wizard payload first so the CLI enters new_project phase.
     // Do NOT emit task:status with 'completed' — it would flash a misleading
     // "Task completed successfully" message before the wizard opens.
-    this.emit('slash:result', { command: '/new-project', output });
+    this.emit('slash:result', { command: '/new-project', output: augmentedOutput });
 
     // Persist the run as completed for logging, but don't broadcast it.
     run.status = 'completed';
