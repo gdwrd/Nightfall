@@ -429,10 +429,10 @@ export type AppAction =
 
 ### Task 4: NewProjectWizard Component
 
-- [ ] Create `packages/cli/src/components/NewProjectWizard.tsx` with full wizard UI
-- [ ] Render Q&A history, current question, spinner during compilation, plan confirmation
-- [ ] Handle `/done` and `/cancel` interception
-- [ ] All tests and lint pass
+- [x] Create `packages/cli/src/components/NewProjectWizard.tsx` with full wizard UI
+- [x] Render Q&A history, current question, spinner during compilation, plan confirmation
+- [x] Handle `/done` and `/cancel` interception
+- [x] All tests and lint pass
 
 ### Files to Create
 
