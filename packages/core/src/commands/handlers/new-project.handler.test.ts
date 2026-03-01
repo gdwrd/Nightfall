@@ -58,18 +58,17 @@ afterEach(async () => {
 // ---------------------------------------------------------------------------
 
 describe('newProjectHandler — no args', () => {
-  it('returns new_project_ask_idea with a sessionId', async () => {
+  it('returns new_project_ask_idea without creating a session', async () => {
     const result = await newProjectHandler(makeCtx(), '');
     const data = parse(result);
     expect(data.type).toBe('new_project_ask_idea');
-    expect(data.sessionId).toBeDefined();
-    expect(typeof data.sessionId).toBe('string');
   });
 
   it('returns error when a session is already active', async () => {
-    // Start one session
-    await newProjectHandler(makeCtx(), '');
-    // Try to start another
+    // Start a real session via 'start'
+    const provider = makeProvider(['First question?']);
+    await newProjectHandler(makeCtx(provider), 'start An idea');
+    // Try no-args
     const result = await newProjectHandler(makeCtx(), '');
     const data = parse(result);
     expect(data.type).toBe('new_project_error');

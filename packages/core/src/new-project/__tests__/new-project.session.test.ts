@@ -148,9 +148,6 @@ describe('NewProjectSessionManager', () => {
 
     s.status = 'plan_saved';
     expect(mgr.get(s.id)!.status).toBe('plan_saved');
-
-    s.status = 'done';
-    expect(mgr.get(s.id)!.status).toBe('done');
   });
 });
 

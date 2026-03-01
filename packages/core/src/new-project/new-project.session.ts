@@ -8,8 +8,7 @@ export type SessionStatus =
   | 'gathering'
   | 'ready_to_compile'
   | 'spec_saved'
-  | 'plan_saved'
-  | 'done';
+  | 'plan_saved';
 
 export interface NewProjectSession {
   id: string;

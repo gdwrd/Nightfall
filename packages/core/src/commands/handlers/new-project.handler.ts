@@ -72,7 +72,17 @@ async function handleAnswer(
   answer: string,
 ): Promise<string> {
   const session = getSessionOrThrow(sessionId);
+
+  if (session.status !== 'gathering') {
+    throw new HandlerError('Q&A has already ended for this session.');
+  }
+
   const provider = ctx.provider;
+
+  // Record the user's answer in history before the LLM call so it is
+  // preserved even if the provider throws.
+  session.history.push({ role: 'user', content: answer });
+  session.questionCount++;
 
   // Build conversation messages for the LLM
   const messages: ChatMessage[] = [
@@ -82,14 +92,15 @@ async function handleAnswer(
       role: h.role as ChatMessage['role'],
       content: h.content,
     })),
-    { role: 'user', content: answer },
   ];
 
   const response = await collectResponse(provider, messages);
 
-  // Record the user's answer in history
-  session.history.push({ role: 'user', content: answer });
-  session.questionCount++;
+  // Record the LLM's response in history (strip sentinel if present)
+  const cleanResponse = response.replace(/\[SPEC_READY\]/g, '').trim();
+  if (cleanResponse) {
+    session.history.push({ role: 'assistant', content: cleanResponse });
+  }
 
   // Check for [SPEC_READY] sentinel or max questions reached
   if (response.includes('[SPEC_READY]') || session.questionCount >= MAX_QUESTIONS) {
@@ -101,9 +112,6 @@ async function handleAnswer(
     });
   }
 
-  // Record the LLM's question in history
-  session.history.push({ role: 'assistant', content: response });
-
   return JSON.stringify({
     type: 'new_project_question',
     sessionId: session.id,
@@ -112,7 +120,7 @@ async function handleAnswer(
   });
 }
 
-async function handleDone(sessionId: string): Promise<string> {
+function handleDone(sessionId: string): string {
   const session = getSessionOrThrow(sessionId);
 
   const hasUserAnswers = session.history.some((h) => h.role === 'user');
@@ -133,6 +141,11 @@ async function handleGenerateSpec(
   sessionId: string,
 ): Promise<string> {
   const session = getSessionOrThrow(sessionId);
+
+  if (session.status !== 'ready_to_compile') {
+    throw new HandlerError('Q&A is not complete yet. Finish answering questions first.');
+  }
+
   const provider = ctx.provider;
 
   const conversationText = formatConversation(session);
@@ -194,6 +207,7 @@ async function handleGeneratePlan(
   const result = JSON.stringify({
     type: 'new_project_plan_saved',
     sessionId: session.id,
+    specPath: session.specPath,
     planPath,
   });
 
@@ -260,7 +274,7 @@ export async function newProjectHandler(
   const trimmed = args.trim();
 
   try {
-    // /new-project (no args) → ask for idea
+    // /new-project (no args) → ask for idea (no session created yet)
     if (!trimmed) {
       if (sessionManager.hasActive()) {
         return JSON.stringify({
@@ -268,11 +282,8 @@ export async function newProjectHandler(
           message: 'A wizard session is already in progress. Type /cancel to start over.',
         });
       }
-      // Create a session with empty idea — CLI will ask for it
-      const session = sessionManager.create('');
       return JSON.stringify({
         type: 'new_project_ask_idea',
-        sessionId: session.id,
       });
     }
 
@@ -316,7 +327,7 @@ export async function newProjectHandler(
     // /new-project done <sessionId>
     if (trimmed === 'done' || trimmed.startsWith('done ')) {
       const sessionId = trimmed === 'done' ? '' : trimmed.slice('done '.length).trim();
-      return await handleDone(sessionId);
+      return handleDone(sessionId);
     }
 
     // /new-project generate-spec <sessionId>

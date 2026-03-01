@@ -213,7 +213,7 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
               dispatch({
                 type: 'SET_NEW_PROJECT',
                 data: {
-                  sessionId: data.sessionId as string,
+                  sessionId: '', // No session yet — will be set when start responds
                   status: 'asking_idea',
                   currentQuestion: 'What would you like to build? Describe your idea in a few sentences.',
                   questionNumber: 0,
@@ -226,9 +226,14 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
               dispatch({
                 type: 'UPDATE_NEW_PROJECT',
                 partial: {
+                  sessionId: data.sessionId as string,
                   status: 'gathering',
                   currentQuestion: data.question as string,
                   questionNumber: data.questionNumber as number,
+                  history: [
+                    ...(state.newProjectData?.history ?? []),
+                    { role: 'assistant' as const, content: data.question as string },
+                  ],
                 },
               });
               return;
@@ -252,7 +257,7 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
               dispatch({ type: 'CLEAR_NEW_PROJECT' });
               dispatch({
                 type: 'SET_SLASH_OUTPUT',
-                output: `✓ Project spec and plan saved!\n  Spec: ${(data.planPath as string).replace(/-plan\.md$/, '.md')}\n  Plan: ${data.planPath as string}`,
+                output: `✓ Project spec and plan saved!\n  Spec: ${data.specPath as string}\n  Plan: ${data.planPath as string}`,
               });
               return;
 

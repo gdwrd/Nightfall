@@ -532,15 +532,11 @@ describe('integration: no-args start flow', () => {
     const provider = makeProvider(['What is the core feature?']);
     const ctx = makeCtx(provider);
 
-    // Step 1: No args — get ask_idea prompt
+    // Step 1: No args — get ask_idea prompt (no session created)
     const askIdea = parse(await newProjectHandler(ctx, ''));
     expect(askIdea.type).toBe('new_project_ask_idea');
-    const sessionId = askIdea.sessionId as string;
 
-    // Step 2: Cancel the empty session to start fresh with idea
-    await newProjectHandler(ctx, `cancel ${sessionId}`);
-
-    // Step 3: Now start with idea
+    // Step 2: Start with idea — no need to cancel, no session was created
     const start = parse(await newProjectHandler(ctx, 'start A monitoring dashboard'));
     expect(start.type).toBe('new_project_question');
     expect(start.question).toBe('What is the core feature?');

@@ -72,7 +72,7 @@ export const NewProjectWizard: React.FC<NewProjectWizardProps> = ({
   const headerLabel =
     status === 'asking_idea'
       ? 'NEW PROJECT'
-      : `Question ${questionNumber}`;
+      : `Question ${questionNumber + 1}`;
 
   return (
     <Box
