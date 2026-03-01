@@ -206,12 +206,12 @@ Barrel export for the module.
 
 ### Task 2: Command Handler
 
-- [ ] Create `packages/core/src/commands/handlers/new-project.handler.ts` with sub-command routing (start, answer, done, generate-spec, generate-plan, cancel)
-- [ ] Add `provider` to `CommandDispatcherContext` interface
-- [ ] Register `/new-project` case in `command.dispatcher.ts`
-- [ ] Update `NightfallServer` to pass provider to dispatcher context
-- [ ] Write unit tests for the handler
-- [ ] All tests and lint pass
+- [x] Create `packages/core/src/commands/handlers/new-project.handler.ts` with sub-command routing (start, answer, done, generate-spec, generate-plan, cancel)
+- [x] Add `provider` to `CommandDispatcherContext` interface
+- [x] Register `/new-project` case in `command.dispatcher.ts`
+- [x] Update `NightfallServer` to pass provider to dispatcher context
+- [x] Write unit tests for the handler
+- [x] All tests and lint pass
 
 ### Files to Create
 
