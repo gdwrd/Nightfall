@@ -65,10 +65,7 @@ export class AnthropicAdapter implements ProviderAdapter {
         if (signal?.aborted) {
           return;
         }
-        if (
-          event.type === 'content_block_delta' &&
-          event.delta.type === 'text_delta'
-        ) {
+        if (event.type === 'content_block_delta' && event.delta.type === 'text_delta') {
           yield event.delta.text;
         }
       }

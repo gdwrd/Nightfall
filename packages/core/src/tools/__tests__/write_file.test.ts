@@ -23,7 +23,10 @@ afterAll(async () => {
 
 describe('write_file tool', () => {
   it('creates a file with content', async () => {
-    const result = await writeFileTool.execute({ path: 'output.ts', content: 'hello world' }, ctx());
+    const result = await writeFileTool.execute(
+      { path: 'output.ts', content: 'hello world' },
+      ctx(),
+    );
     expect(result.success).toBe(true);
     const written = await fs.readFile(path.join(tmpDir, 'output.ts'), 'utf-8');
     expect(written).toBe('hello world');

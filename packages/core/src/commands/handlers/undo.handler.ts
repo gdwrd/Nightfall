@@ -33,9 +33,10 @@ export async function undoHandler(ctx: CommandDispatcherContext, args: string): 
 
   try {
     const restoredFiles = await manager.rollback(targetSnapshot.snapshotId);
-    const prompt = targetSnapshot.prompt.length > 60
-      ? targetSnapshot.prompt.slice(0, 59) + '…'
-      : targetSnapshot.prompt;
+    const prompt =
+      targetSnapshot.prompt.length > 60
+        ? targetSnapshot.prompt.slice(0, 59) + '…'
+        : targetSnapshot.prompt;
 
     const lines: string[] = [];
 
@@ -50,7 +51,10 @@ export async function undoHandler(ctx: CommandDispatcherContext, args: string): 
     }
 
     if (rollbackErrors.length > 0) {
-      lines.push('', `⚠ ${rollbackErrors.length} error${rollbackErrors.length === 1 ? '' : 's'} during rollback:`);
+      lines.push(
+        '',
+        `⚠ ${rollbackErrors.length} error${rollbackErrors.length === 1 ? '' : 's'} during rollback:`,
+      );
       for (const e of rollbackErrors) {
         lines.push(`  ${e}`);
       }

@@ -52,10 +52,7 @@ describe('update_index tool', () => {
   });
 
   it('updates an existing entry without creating duplicates', async () => {
-    await updateIndexTool.execute(
-      { file: 'api.md', description: 'Old description' },
-      ctx(),
-    );
+    await updateIndexTool.execute({ file: 'api.md', description: 'Old description' }, ctx());
     const result = await updateIndexTool.execute(
       { file: 'api.md', description: 'Updated description' },
       ctx(),

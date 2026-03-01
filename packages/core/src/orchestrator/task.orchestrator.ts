@@ -658,8 +658,8 @@ export class TaskOrchestrator extends EventEmitter {
     const maxIterations: AgentFactoryOptions['maxIterations'] = agentsCfg
       ? {
           'team-lead': agentsCfg['team-lead']?.max_iterations,
-          'engineer': agentsCfg['engineer']?.max_iterations,
-          'reviewer': agentsCfg['reviewer']?.max_iterations,
+          engineer: agentsCfg['engineer']?.max_iterations,
+          reviewer: agentsCfg['reviewer']?.max_iterations,
           'memory-manager': agentsCfg['memory-manager']?.max_iterations,
         }
       : undefined;
@@ -668,13 +668,23 @@ export class TaskOrchestrator extends EventEmitter {
       provider: this.options.provider,
       projectRoot: this.options.projectRoot,
       customPrompts: {},
-      maxContextTokens: this.options.config.context_window ?? getModelContextWindow(this.options.config.provider.model) ?? this.options.config.task.max_context_tokens,
+      maxContextTokens:
+        this.options.config.context_window ??
+        getModelContextWindow(this.options.config.provider.model) ??
+        this.options.config.task.max_context_tokens,
       maxIterations,
       memoryNamespace: this.options.config.memoryNamespace,
     };
 
     const agentsDir = path.join(this.options.projectRoot, '.nightfall', '.agents');
-    const roles = ['team-lead', 'engineer', 'reviewer', 'memory-manager', 'classifier', 'responder'] as const;
+    const roles = [
+      'team-lead',
+      'engineer',
+      'reviewer',
+      'memory-manager',
+      'classifier',
+      'responder',
+    ] as const;
 
     for (const role of roles) {
       try {
@@ -758,7 +768,7 @@ export class TaskOrchestrator extends EventEmitter {
     } catch (err) {
       process.stderr.write(
         `[nightfall] parsePlan: Team Lead response is not valid JSON — ` +
-        `falling back to single subtask. Error: ${err instanceof Error ? err.message : String(err)}\n`,
+          `falling back to single subtask. Error: ${err instanceof Error ? err.message : String(err)}\n`,
       );
       return {
         taskId,

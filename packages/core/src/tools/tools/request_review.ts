@@ -89,6 +89,6 @@ export const requestReviewTool: ToolImpl = {
   },
 };
 
-export const parameterSchema: ParameterSchema[] = Object.entries(requestReviewTool.definition.parameters).map(
-  ([name, def]) => ({ name, ...def }),
-);
+export const parameterSchema: ParameterSchema[] = Object.entries(
+  requestReviewTool.definition.parameters,
+).map(([name, def]) => ({ name, ...def }));

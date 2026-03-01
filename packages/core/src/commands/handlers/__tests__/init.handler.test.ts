@@ -42,7 +42,10 @@ describe('initHandler', () => {
     it('does not create files during preview', async () => {
       await initHandler(ctx, '');
       const memDir = path.join(tmpDir, '.nightfall', 'memory');
-      const exists = await fs.stat(memDir).then(() => true).catch(() => false);
+      const exists = await fs
+        .stat(memDir)
+        .then(() => true)
+        .catch(() => false);
       expect(exists).toBe(false);
     });
 

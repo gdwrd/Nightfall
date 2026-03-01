@@ -82,6 +82,6 @@ export const assignTaskTool: ToolImpl = {
   },
 };
 
-export const parameterSchema: ParameterSchema[] = Object.entries(assignTaskTool.definition.parameters).map(
-  ([name, def]) => ({ name, ...def }),
-);
+export const parameterSchema: ParameterSchema[] = Object.entries(
+  assignTaskTool.definition.parameters,
+).map(([name, def]) => ({ name, ...def }));

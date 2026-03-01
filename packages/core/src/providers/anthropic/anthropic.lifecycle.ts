@@ -13,8 +13,7 @@ export async function checkAnthropicKey(
   onEvent({ type: 'detecting' });
 
   // Resolve API key: config-level override takes priority over env var
-  const anthropicConfig =
-    config.provider.name === 'anthropic' ? config.provider : undefined;
+  const anthropicConfig = config.provider.name === 'anthropic' ? config.provider : undefined;
   const apiKey = anthropicConfig?.api_key ?? process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {

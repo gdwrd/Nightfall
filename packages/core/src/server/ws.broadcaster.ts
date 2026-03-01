@@ -75,7 +75,7 @@ export class WsBroadcaster {
             : run.status === 'rework_limit_reached'
               ? 'Rework limit reached. Review changes manually.'
               : run.status === 'answered'
-                ? run.answer ?? 'Question answered.'
+                ? (run.answer ?? 'Question answered.')
                 : 'Task cancelled.';
         this.broadcast({
           type: 'TASK_COMPLETE',

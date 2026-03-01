@@ -16,7 +16,9 @@ beforeEach(async () => {
     config: {} as CommandDispatcherContext['config'],
     projectRoot: tmpDir,
     orchestrator: {
-      clearHistory: () => { clearHistoryCalled = true; },
+      clearHistory: () => {
+        clearHistoryCalled = true;
+      },
     } as unknown as CommandDispatcherContext['orchestrator'],
     provider: {} as CommandDispatcherContext['provider'],
   };

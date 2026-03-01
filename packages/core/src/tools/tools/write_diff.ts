@@ -113,6 +113,6 @@ export const writeDiffTool: ToolImpl = {
   },
 };
 
-export const parameterSchema: ParameterSchema[] = Object.entries(writeDiffTool.definition.parameters).map(
-  ([name, def]) => ({ name, ...def }),
-);
+export const parameterSchema: ParameterSchema[] = Object.entries(
+  writeDiffTool.definition.parameters,
+).map(([name, def]) => ({ name, ...def }));

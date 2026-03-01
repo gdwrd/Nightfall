@@ -317,7 +317,8 @@ export async function newProjectHandler(
       if (sessionManager.hasActive()) {
         return JSON.stringify({
           type: 'new_project_error',
-          message: 'A wizard session is already in progress. Run /new-project cancel to start over.',
+          message:
+            'A wizard session is already in progress. Run /new-project cancel to start over.',
         });
       }
       return JSON.stringify({

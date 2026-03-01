@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 import { Box, Text, useInput } from 'ink';
-import type { NightfallConfig, OllamaProviderConfig, AnthropicProviderConfig } from '@nightfall/shared';
+import type {
+  NightfallConfig,
+  OllamaProviderConfig,
+  AnthropicProviderConfig,
+} from '@nightfall/shared';
 import { THEME } from '../theme.js';
 
 // ---------------------------------------------------------------------------
@@ -21,8 +25,8 @@ interface FormField {
 // Default per-role max_iterations (mirrors agent.factory.ts hardcoded defaults)
 const AGENT_ITERATION_DEFAULTS: Record<string, number> = {
   'team-lead': 20,
-  'engineer': 30,
-  'reviewer': 20,
+  engineer: 30,
+  reviewer: 20,
   'memory-manager': 20,
 };
 
@@ -127,19 +131,29 @@ function fieldsToConfig(fields: FormField[], base: NightfallConfig): NightfallCo
       : providerName === 'anthropic'
         ? ((): AnthropicProviderConfig => {
             const anthropic = base.provider as AnthropicProviderConfig;
-            return { name: 'anthropic', model, ...(anthropic.api_key ? { api_key: anthropic.api_key } : {}) };
+            return {
+              name: 'anthropic',
+              model,
+              ...(anthropic.api_key ? { api_key: anthropic.api_key } : {}),
+            };
           })()
         : { name: 'openrouter', model };
 
   // Collect per-role agent iteration overrides
-  const agentFields = fields.filter((f) => f.key.startsWith('agent:') && f.key.endsWith(':max_iterations'));
+  const agentFields = fields.filter(
+    (f) => f.key.startsWith('agent:') && f.key.endsWith(':max_iterations'),
+  );
   let agents: NightfallConfig['agents'];
   if (agentFields.length > 0) {
     agents = {};
     for (const f of agentFields) {
       const parts = f.key.split(':');
       // key format: "agent:<role>:max_iterations"
-      const role = parts.slice(1, -1).join(':') as 'team-lead' | 'engineer' | 'reviewer' | 'memory-manager';
+      const role = parts.slice(1, -1).join(':') as
+        | 'team-lead'
+        | 'engineer'
+        | 'reviewer'
+        | 'memory-manager';
       const val = parseInt(f.value, 10);
       if (!isNaN(val) && val > 0) {
         agents[role] = { max_iterations: val };
@@ -155,7 +169,9 @@ function fieldsToConfig(fields: FormField[], base: NightfallConfig): NightfallCo
 
   return {
     provider,
-    concurrency: { max_engineers: parseIntSafe(get('max_engineers', '1'), base.concurrency.max_engineers) },
+    concurrency: {
+      max_engineers: parseIntSafe(get('max_engineers', '1'), base.concurrency.max_engineers),
+    },
     task: {
       max_rework_cycles: parseIntSafe(get('max_rework_cycles', '3'), base.task.max_rework_cycles),
       max_retries: base.task.max_retries,
@@ -163,8 +179,12 @@ function fieldsToConfig(fields: FormField[], base: NightfallConfig): NightfallCo
     },
     logs: { retention: parseIntSafe(get('log_retention', '50'), base.logs.retention) },
     ...(agentFields.length > 0
-      ? agents !== undefined ? { agents } : {}
-      : base.agents !== undefined ? { agents: base.agents } : {}),
+      ? agents !== undefined
+        ? { agents }
+        : {}
+      : base.agents !== undefined
+        ? { agents: base.agents }
+        : {}),
     ...(base.context_window !== undefined ? { context_window: base.context_window } : {}),
     ...(base.memoryNamespace !== undefined ? { memoryNamespace: base.memoryNamespace } : {}),
   };
@@ -180,11 +200,7 @@ interface SettingsViewProps {
   onExit: () => void;
 }
 
-export const SettingsView: React.FC<SettingsViewProps> = ({
-  initialConfig,
-  onSave,
-  onExit,
-}) => {
+export const SettingsView: React.FC<SettingsViewProps> = ({ initialConfig, onSave, onExit }) => {
   const [agentSectionExpanded, setAgentSectionExpanded] = useState(false);
   const [fields, setFields] = useState<FormField[]>(() => buildFields(initialConfig, false));
   const [cursorIndex, setCursorIndex] = useState(0);
@@ -200,9 +216,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
       if (key.escape) {
         // Discard — restore original value for this field
-        setFields((prev) =>
-          prev.map((f, i) => (i === idx ? { ...f, value: f.originalValue } : f)),
-        );
+        setFields((prev) => prev.map((f, i) => (i === idx ? { ...f, value: f.originalValue } : f)));
         setEditingIndex(null);
         return;
       }
@@ -220,9 +234,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       }
 
       if (input && !key.ctrl && !key.meta) {
-        setFields((prev) =>
-          prev.map((f, i) => (i === idx ? { ...f, value: f.value + input } : f)),
-        );
+        setFields((prev) => prev.map((f, i) => (i === idx ? { ...f, value: f.value + input } : f)));
       }
       return; // Consume all input while in edit mode
     }
@@ -251,13 +263,19 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       if (field.type === 'provider_toggle') {
         // Cycle provider and rebuild the field list (adds/removes host+port)
         const providers = field.providers ?? ['ollama', 'openrouter'];
-        const nextProvider = providers[(providers.indexOf(field.value) + 1) % providers.length] ?? field.value;
+        const nextProvider =
+          providers[(providers.indexOf(field.value) + 1) % providers.length] ?? field.value;
         const currentConfig = fieldsToConfig(fields, initialConfig);
         const rebased: NightfallConfig = {
           ...currentConfig,
           provider:
             nextProvider === 'ollama'
-              ? { name: 'ollama', model: currentConfig.provider.model, host: 'localhost', port: 11434 }
+              ? {
+                  name: 'ollama',
+                  model: currentConfig.provider.model,
+                  host: 'localhost',
+                  port: 11434,
+                }
               : nextProvider === 'anthropic'
                 ? { name: 'anthropic', model: currentConfig.provider.model }
                 : { name: 'openrouter', model: currentConfig.provider.model },
@@ -291,8 +309,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   });
 
   return (
-    <Box flexDirection="column" borderStyle="single" borderColor={THEME.accent} paddingX={2} paddingY={1}>
-      <Text bold color={THEME.primary}>◆ SETTINGS</Text>
+    <Box
+      flexDirection="column"
+      borderStyle="single"
+      borderColor={THEME.accent}
+      paddingX={2}
+      paddingY={1}
+    >
+      <Text bold color={THEME.primary}>
+        ◆ SETTINGS
+      </Text>
       <Text color={THEME.textDim}>Changes take effect on restart.</Text>
 
       <Box marginTop={1} flexDirection="column">
@@ -308,7 +334,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <Text color={isSelected ? THEME.primary : THEME.textDim}>
                   {isSelected ? '▶ ' : '  '}
                   {isExpanded ? '▼ Agent iteration limits' : '▶ Agent iteration limits'}
-                  <Text color={THEME.dim}>  [Enter to {isExpanded ? 'collapse' : 'expand'}]</Text>
+                  <Text color={THEME.dim}> [Enter to {isExpanded ? 'collapse' : 'expand'}]</Text>
                 </Text>
               </Box>
             );

@@ -17,10 +17,7 @@ let tmpDir: string;
  * Each call to complete() returns the next response in the list.
  * Optionally yields responses in multiple chunks to test streaming.
  */
-function makeProvider(
-  responses: string[] = [],
-  opts?: { chunkSize?: number },
-): ProviderAdapter {
+function makeProvider(responses: string[] = [], opts?: { chunkSize?: number }): ProviderAdapter {
   let idx = 0;
   return {
     async *complete(_messages: ChatMessage[]): AsyncGenerator<string> {
@@ -42,9 +39,10 @@ function makeProvider(
 /**
  * Create a mock provider that captures the messages passed to complete().
  */
-function makeCapturingProvider(
-  responses: string[] = [],
-): { provider: ProviderAdapter; calls: ChatMessage[][] } {
+function makeCapturingProvider(responses: string[] = []): {
+  provider: ProviderAdapter;
+  calls: ChatMessage[][];
+} {
   let idx = 0;
   const calls: ChatMessage[][] = [];
   const provider: ProviderAdapter = {
@@ -93,9 +91,9 @@ afterEach(async () => {
 describe('integration: full wizard lifecycle', () => {
   it('completes start → answer → answer → [SPEC_READY] → generate-spec → generate-plan', async () => {
     const provider = makeProvider([
-      'What is the target audience?',       // first question after start
-      'What platforms should it support?',   // second question after answer
-      'Enough detail. [SPEC_READY]',         // third answer triggers completion
+      'What is the target audience?', // first question after start
+      'What platforms should it support?', // second question after answer
+      'Enough detail. [SPEC_READY]', // third answer triggers completion
       '# Task App Spec\n\nA comprehensive specification for a task management app.',
       '# Task App Plan\n\n## Phase 1\n\nSet up the project structure.',
     ]);
@@ -108,7 +106,9 @@ describe('integration: full wizard lifecycle', () => {
     const sessionId = startResult.sessionId as string;
 
     // Step 2: First answer
-    const answer1 = parse(await newProjectHandler(ctx, `answer ${sessionId} Small business owners`));
+    const answer1 = parse(
+      await newProjectHandler(ctx, `answer ${sessionId} Small business owners`),
+    );
     expect(answer1.type).toBe('new_project_question');
     expect(answer1.question).toBe('What platforms should it support?');
 
@@ -150,9 +150,9 @@ describe('integration: full wizard lifecycle', () => {
 
   it('completes flow using /done to end Q&A early', async () => {
     const provider = makeProvider([
-      'What is the core problem?',         // consumed by start
-      'What about scalability?',            // consumed by answer
-      '# Early Spec\n\nSpec from early /done.',  // consumed by generate-spec
+      'What is the core problem?', // consumed by start
+      'What about scalability?', // consumed by answer
+      '# Early Spec\n\nSpec from early /done.', // consumed by generate-spec
     ]);
     const ctx = makeCtx(provider);
 
@@ -161,7 +161,9 @@ describe('integration: full wizard lifecycle', () => {
     const sessionId = startResult.sessionId as string;
 
     // One answer — gets another question back
-    const answerResult = parse(await newProjectHandler(ctx, `answer ${sessionId} Real-time messaging for teams`));
+    const answerResult = parse(
+      await newProjectHandler(ctx, `answer ${sessionId} Real-time messaging for teams`),
+    );
     expect(answerResult.type).toBe('new_project_question');
 
     // Done early (skip remaining questions)
@@ -207,10 +209,7 @@ describe('integration: full wizard lifecycle', () => {
 
 describe('integration: cancel flows', () => {
   it('cancels mid-flow and allows starting over', async () => {
-    const provider = makeProvider([
-      'What do you want to build?',
-      'Another question?',
-    ]);
+    const provider = makeProvider(['What do you want to build?', 'Another question?']);
     const ctx = makeCtx(provider);
 
     // Start and provide one answer
@@ -230,11 +229,7 @@ describe('integration: cancel flows', () => {
   });
 
   it('cancel after spec generation includes specPath', async () => {
-    const provider = makeProvider([
-      'Question?',
-      '[SPEC_READY]',
-      '# The Spec',
-    ]);
+    const provider = makeProvider(['Question?', '[SPEC_READY]', '# The Spec']);
     const ctx = makeCtx(provider);
 
     const start = parse(await newProjectHandler(ctx, 'start Build a blog'));
@@ -257,10 +252,7 @@ describe('integration: streaming provider responses', () => {
   it('collects multi-chunk responses correctly', async () => {
     const fullQuestion = 'What authentication method do you prefer?';
     const fullSpec = '# Multi Chunk Spec\n\nDetailed spec from streaming.';
-    const provider = makeProvider(
-      [fullQuestion, '[SPEC_READY]', fullSpec],
-      { chunkSize: 5 },
-    );
+    const provider = makeProvider([fullQuestion, '[SPEC_READY]', fullSpec], { chunkSize: 5 });
     const ctx = makeCtx(provider);
 
     // Start — question should be fully assembled from chunks
@@ -362,12 +354,7 @@ describe('integration: MAX_QUESTIONS auto-completion', () => {
 
 describe('integration: file paths', () => {
   it('saves spec and plan to spec/ directory with slug-based names', async () => {
-    const provider = makeProvider([
-      'Q?',
-      '[SPEC_READY]',
-      'Spec content',
-      'Plan content',
-    ]);
+    const provider = makeProvider(['Q?', '[SPEC_READY]', 'Spec content', 'Plan content']);
     const ctx = makeCtx(provider);
 
     const start = parse(await newProjectHandler(ctx, 'start A recipe sharing platform'));
@@ -388,11 +375,7 @@ describe('integration: file paths', () => {
   });
 
   it('creates the spec/ directory if it does not exist', async () => {
-    const provider = makeProvider([
-      'Q?',
-      '[SPEC_READY]',
-      'Content',
-    ]);
+    const provider = makeProvider(['Q?', '[SPEC_READY]', 'Content']);
     const ctx = makeCtx(provider);
 
     const specDir = path.join(tmpDir, 'spec');

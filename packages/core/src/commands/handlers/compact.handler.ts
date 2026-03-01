@@ -4,7 +4,7 @@ import { deriveProjectSlug } from '../../memory/memory.init.js';
 import type { CommandDispatcherContext } from '../command.dispatcher.js';
 
 export async function compactHandler(ctx: CommandDispatcherContext): Promise<string> {
-  const namespace = ctx.config.memoryNamespace ?? await deriveProjectSlug(ctx.projectRoot);
+  const namespace = ctx.config.memoryNamespace ?? (await deriveProjectSlug(ctx.projectRoot));
   const manager = new MemoryManager(ctx.projectRoot, namespace);
   const results = await manager.compactAll(ctx.provider);
 

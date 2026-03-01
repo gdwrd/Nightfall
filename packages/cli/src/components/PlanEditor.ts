@@ -91,7 +91,11 @@ function runEditor(editor: { bin: string; args: string[] }, file: string): Promi
     try {
       child = spawn(editor.bin, [...editor.args, file], { stdio: 'inherit' });
     } catch (err) {
-      reject(new Error(`Failed to launch editor "${editor.bin}": ${err instanceof Error ? err.message : String(err)}`));
+      reject(
+        new Error(
+          `Failed to launch editor "${editor.bin}": ${err instanceof Error ? err.message : String(err)}`,
+        ),
+      );
       return;
     }
 

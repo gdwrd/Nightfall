@@ -133,6 +133,6 @@ export const searchFilesTool: ToolImpl = {
   },
 };
 
-export const parameterSchema: ParameterSchema[] = Object.entries(searchFilesTool.definition.parameters).map(
-  ([name, def]) => ({ name, ...def }),
-);
+export const parameterSchema: ParameterSchema[] = Object.entries(
+  searchFilesTool.definition.parameters,
+).map(([name, def]) => ({ name, ...def }));

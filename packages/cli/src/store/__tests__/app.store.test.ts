@@ -327,9 +327,21 @@ describe('SET_SLASH_OUTPUT', () => {
 
 describe('SET_PHASE', () => {
   const validPhases: AppPhase[] = [
-    'lifecycle', 'idle', 'classifying', 'planning', 'awaiting_approval',
-    'editing_plan', 'running', 'answered', 'completed', 'error',
-    'history_view', 'rollback_confirm', 'model_view', 'settings_view', 'new_project',
+    'lifecycle',
+    'idle',
+    'classifying',
+    'planning',
+    'awaiting_approval',
+    'editing_plan',
+    'running',
+    'answered',
+    'completed',
+    'error',
+    'history_view',
+    'rollback_confirm',
+    'model_view',
+    'settings_view',
+    'new_project',
   ];
 
   for (const phase of validPhases) {

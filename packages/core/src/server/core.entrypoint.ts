@@ -58,7 +58,7 @@ function preflightProviderCheck(config: NightfallConfig): void {
     if (!process.env.OPENROUTER_API_KEY) {
       process.stderr.write(
         'Error: OPENROUTER_API_KEY environment variable is not set.\n' +
-        'Set it with: export OPENROUTER_API_KEY=<your-key>\n',
+          'Set it with: export OPENROUTER_API_KEY=<your-key>\n',
       );
       process.exit(1);
     }
@@ -67,15 +67,14 @@ function preflightProviderCheck(config: NightfallConfig): void {
     if (!anthropicCfg.api_key && !process.env.ANTHROPIC_API_KEY) {
       process.stderr.write(
         'Error: ANTHROPIC_API_KEY environment variable is not set.\n' +
-        'Set it with: export ANTHROPIC_API_KEY=<your-key>\n',
+          'Set it with: export ANTHROPIC_API_KEY=<your-key>\n',
       );
       process.exit(1);
     }
   } else if (config.provider.name === 'ollama') {
     if (!isOllamaInstalled()) {
       process.stderr.write(
-        'Error: Ollama is not installed.\n' +
-        'Install it from: https://ollama.ai\n',
+        'Error: Ollama is not installed.\n' + 'Install it from: https://ollama.ai\n',
       );
       process.exit(1);
     }

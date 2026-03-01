@@ -1,9 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  NewProjectSessionManager,
-  deriveSlug,
-  MAX_QUESTIONS,
-} from '../new-project.session.js';
+import { NewProjectSessionManager, deriveSlug, MAX_QUESTIONS } from '../new-project.session.js';
 
 // ---------------------------------------------------------------------------
 // deriveSlug
@@ -19,15 +15,11 @@ describe('deriveSlug', () => {
   });
 
   it('removes punctuation and special characters', () => {
-    expect(deriveSlug('Real-time collaboration tool!!!')).toBe(
-      'realtime-collaboration-tool',
-    );
+    expect(deriveSlug('Real-time collaboration tool!!!')).toBe('realtime-collaboration-tool');
   });
 
   it('limits to 5 words', () => {
-    const slug = deriveSlug(
-      'very long project idea description that goes on and on',
-    );
+    const slug = deriveSlug('very long project idea description that goes on and on');
     const parts = slug.split('-');
     expect(parts.length).toBeLessThanOrEqual(5);
   });

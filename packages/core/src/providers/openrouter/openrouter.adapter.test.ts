@@ -161,10 +161,7 @@ describe('OpenRouterAdapter', () => {
   });
 
   it('streams tokens incrementally via complete()', async () => {
-    const adapter = new OpenRouterAdapter(
-      makeConfig(),
-      `http://127.0.0.1:${serverPort}`,
-    );
+    const adapter = new OpenRouterAdapter(makeConfig(), `http://127.0.0.1:${serverPort}`);
     const chunks: string[] = [];
 
     for await (const token of adapter.complete(HELLO_MESSAGES)) {
@@ -176,10 +173,7 @@ describe('OpenRouterAdapter', () => {
   });
 
   it('respects an already-aborted signal', async () => {
-    const adapter = new OpenRouterAdapter(
-      makeConfig(),
-      `http://127.0.0.1:${serverPort}`,
-    );
+    const adapter = new OpenRouterAdapter(makeConfig(), `http://127.0.0.1:${serverPort}`);
     const controller = new AbortController();
     controller.abort();
 
@@ -192,10 +186,7 @@ describe('OpenRouterAdapter', () => {
   });
 
   it('stops streaming when abort signal fires mid-stream', async () => {
-    const adapter = new OpenRouterAdapter(
-      makeConfig(),
-      `http://127.0.0.1:${serverPort}`,
-    );
+    const adapter = new OpenRouterAdapter(makeConfig(), `http://127.0.0.1:${serverPort}`);
     const controller = new AbortController();
     const chunks: string[] = [];
 
@@ -210,10 +201,7 @@ describe('OpenRouterAdapter', () => {
   });
 
   it('isAvailable() returns true when server is running', async () => {
-    const adapter = new OpenRouterAdapter(
-      makeConfig(),
-      `http://127.0.0.1:${serverPort}`,
-    );
+    const adapter = new OpenRouterAdapter(makeConfig(), `http://127.0.0.1:${serverPort}`);
     const available = await adapter.isAvailable();
     expect(available).toBe(true);
   });
@@ -225,13 +213,8 @@ describe('OpenRouterAdapter', () => {
   });
 
   it('ensureModelReady() succeeds (no-op for cloud models)', async () => {
-    const adapter = new OpenRouterAdapter(
-      makeConfig(),
-      `http://127.0.0.1:${serverPort}`,
-    );
-    await expect(
-      adapter.ensureModelReady('anthropic/claude-sonnet-4'),
-    ).resolves.toBeUndefined();
+    const adapter = new OpenRouterAdapter(makeConfig(), `http://127.0.0.1:${serverPort}`);
+    await expect(adapter.ensureModelReady('anthropic/claude-sonnet-4')).resolves.toBeUndefined();
   });
 });
 

@@ -214,10 +214,7 @@ describe('AnthropicAdapter', () => {
   });
 
   it('streams tokens incrementally via complete()', async () => {
-    const adapter = new AnthropicAdapter(
-      makeConfig(),
-      `http://127.0.0.1:${serverPort}`,
-    );
+    const adapter = new AnthropicAdapter(makeConfig(), `http://127.0.0.1:${serverPort}`);
     const chunks: string[] = [];
 
     for await (const token of adapter.complete(HELLO_MESSAGES)) {
@@ -229,10 +226,7 @@ describe('AnthropicAdapter', () => {
   });
 
   it('tracks token usage after a completed stream', async () => {
-    const adapter = new AnthropicAdapter(
-      makeConfig(),
-      `http://127.0.0.1:${serverPort}`,
-    );
+    const adapter = new AnthropicAdapter(makeConfig(), `http://127.0.0.1:${serverPort}`);
 
     expect(adapter.getLastUsage()).toBeNull();
 
@@ -250,10 +244,7 @@ describe('AnthropicAdapter', () => {
   });
 
   it('respects an already-aborted signal', async () => {
-    const adapter = new AnthropicAdapter(
-      makeConfig(),
-      `http://127.0.0.1:${serverPort}`,
-    );
+    const adapter = new AnthropicAdapter(makeConfig(), `http://127.0.0.1:${serverPort}`);
     const controller = new AbortController();
     controller.abort();
 
@@ -266,10 +257,7 @@ describe('AnthropicAdapter', () => {
   });
 
   it('stops streaming when abort signal fires mid-stream', async () => {
-    const adapter = new AnthropicAdapter(
-      makeConfig(),
-      `http://127.0.0.1:${serverPort}`,
-    );
+    const adapter = new AnthropicAdapter(makeConfig(), `http://127.0.0.1:${serverPort}`);
     const controller = new AbortController();
     const chunks: string[] = [];
 
@@ -290,12 +278,11 @@ describe('AnthropicAdapter', () => {
 
     // maxRetries must be >= 1 for the retry to happen
     const config = makeConfig();
-    (config as unknown as { task: { max_retries: number; max_rework_cycles: number } }).task.max_retries = 2;
+    (
+      config as unknown as { task: { max_retries: number; max_rework_cycles: number } }
+    ).task.max_retries = 2;
 
-    const adapter = new AnthropicAdapter(
-      config,
-      `http://127.0.0.1:${serverPort}`,
-    );
+    const adapter = new AnthropicAdapter(config, `http://127.0.0.1:${serverPort}`);
 
     const chunks: string[] = [];
     for await (const token of adapter.complete(HELLO_MESSAGES)) {
@@ -307,19 +294,13 @@ describe('AnthropicAdapter', () => {
   }, 15_000);
 
   it('isAvailable() returns true when adapter is constructed with a valid key', async () => {
-    const adapter = new AnthropicAdapter(
-      makeConfig(),
-      `http://127.0.0.1:${serverPort}`,
-    );
+    const adapter = new AnthropicAdapter(makeConfig(), `http://127.0.0.1:${serverPort}`);
     const available = await adapter.isAvailable();
     expect(available).toBe(true);
   });
 
   it('ensureModelReady() is a no-op for cloud models', async () => {
-    const adapter = new AnthropicAdapter(
-      makeConfig(),
-      `http://127.0.0.1:${serverPort}`,
-    );
+    const adapter = new AnthropicAdapter(makeConfig(), `http://127.0.0.1:${serverPort}`);
     await expect(adapter.ensureModelReady('claude-sonnet-4-6')).resolves.toBeUndefined();
   });
 });

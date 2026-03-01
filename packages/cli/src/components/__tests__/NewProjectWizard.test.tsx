@@ -54,7 +54,7 @@ describe('NewProjectWizard — rendering', () => {
       { role: 'user', content: 'Developers' },
     ];
     const { lastFrame } = render(
-      <NewProjectWizard {...makeProps({ status: 'gathering', history, questionNumber: 2 })} />
+      <NewProjectWizard {...makeProps({ status: 'gathering', history, questionNumber: 2 })} />,
     );
     const frame = lastFrame()!;
     expect(frame).toContain('Q1:');
@@ -78,7 +78,7 @@ describe('NewProjectWizard — rendering', () => {
           currentQuestion: 'What should the app do?',
           questionNumber: 0,
         })}
-      />
+      />,
     );
     const frame = lastFrame()!;
     expect(frame).toContain('What should the app do?');
@@ -87,17 +87,13 @@ describe('NewProjectWizard — rendering', () => {
 
   it('shows "Type your answer or /done" placeholder in gathering state', () => {
     const { lastFrame } = render(
-      <NewProjectWizard
-        {...makeProps({ status: 'gathering', currentQuestion: 'Describe it.' })}
-      />
+      <NewProjectWizard {...makeProps({ status: 'gathering', currentQuestion: 'Describe it.' })} />,
     );
     expect(lastFrame()!).toContain('/done');
   });
 
   it('shows spinner and "Generating specification..." during compiling_spec', () => {
-    const { lastFrame } = render(
-      <NewProjectWizard {...makeProps({ status: 'compiling_spec' })} />
-    );
+    const { lastFrame } = render(<NewProjectWizard {...makeProps({ status: 'compiling_spec' })} />);
     const frame = lastFrame()!;
     expect(frame).toContain('Generating specification...');
     // Input bar is hidden during compilation
@@ -105,18 +101,14 @@ describe('NewProjectWizard — rendering', () => {
   });
 
   it('shows spinner and "Generating development plan..." during compiling_plan', () => {
-    const { lastFrame } = render(
-      <NewProjectWizard {...makeProps({ status: 'compiling_plan' })} />
-    );
+    const { lastFrame } = render(<NewProjectWizard {...makeProps({ status: 'compiling_plan' })} />);
     const frame = lastFrame()!;
     expect(frame).toContain('Generating development plan...');
     expect(frame).not.toContain('Describe your project idea');
   });
 
   it('shows plan confirmation prompt in asking_plan state', () => {
-    const { lastFrame } = render(
-      <NewProjectWizard {...makeProps({ status: 'asking_plan' })} />
-    );
+    const { lastFrame } = render(<NewProjectWizard {...makeProps({ status: 'asking_plan' })} />);
     const frame = lastFrame()!;
     expect(frame).toContain('Specification saved');
     expect(frame).toContain('Would you like to generate a development plan');
@@ -125,9 +117,7 @@ describe('NewProjectWizard — rendering', () => {
 
   it('shows /done and /cancel key hints in gathering state', () => {
     const { lastFrame } = render(
-      <NewProjectWizard
-        {...makeProps({ status: 'gathering', currentQuestion: 'Q?' })}
-      />
+      <NewProjectWizard {...makeProps({ status: 'gathering', currentQuestion: 'Q?' })} />,
     );
     const frame = lastFrame()!;
     expect(frame).toContain('/done');
@@ -165,7 +155,7 @@ describe('NewProjectWizard — handleSubmit logic', () => {
       onDone: ReturnType<typeof vi.fn>;
       onCancel: ReturnType<typeof vi.fn>;
       onConfirmPlan: ReturnType<typeof vi.fn>;
-    }
+    },
   ) {
     const trimmed = value.trim();
     if (!trimmed) return;

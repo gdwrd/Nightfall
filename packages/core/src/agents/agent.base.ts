@@ -177,8 +177,8 @@ export class BaseAgent extends EventEmitter {
         if (currentTokens > maxContextTokens) {
           process.stderr.write(
             `[nightfall] agent ${this.config.id}: context overflow — ` +
-            `~${currentTokens} tokens exceeds budget ${maxContextTokens}; ` +
-            `no messages left to compact (${messages.length} total).\n`,
+              `~${currentTokens} tokens exceeds budget ${maxContextTokens}; ` +
+              `no messages left to compact (${messages.length} total).\n`,
           );
         }
       }

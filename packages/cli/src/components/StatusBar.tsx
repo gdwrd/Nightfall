@@ -16,15 +16,17 @@ export const StatusBar: React.FC<StatusBarProps> = ({ locks, lastTaskTokens }) =
       {locks.length > 0 && (
         <Box borderStyle="single" borderColor={THEME.accent} paddingX={1}>
           <Text color={THEME.warning}>🔒 Locked: </Text>
-          <Text color={THEME.textDim}>{locks.map((l) => `${l.path} (${l.lockedBy})`).join('  ')}</Text>
+          <Text color={THEME.textDim}>
+            {locks.map((l) => `${l.path} (${l.lockedBy})`).join('  ')}
+          </Text>
         </Box>
       )}
       {lastTaskTokens && (
         <Box paddingX={1}>
           <Text color={THEME.textDim}>
             tokens used: {lastTaskTokens.totalTokens.toLocaleString()}
-            {'  '}(↑ prompt: {lastTaskTokens.promptTokens.toLocaleString()}{'  '}
-            ↓ completion: {lastTaskTokens.completionTokens.toLocaleString()})
+            {'  '}(↑ prompt: {lastTaskTokens.promptTokens.toLocaleString()}
+            {'  '}↓ completion: {lastTaskTokens.completionTokens.toLocaleString()})
           </Text>
         </Box>
       )}

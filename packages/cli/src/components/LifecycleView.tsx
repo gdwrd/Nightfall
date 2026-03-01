@@ -65,12 +65,18 @@ export const LifecycleView: React.FC<LifecycleViewProps> = ({ event }) => {
         </Box>
       )}
       {isProviderError && (
-        <Box marginTop={1} flexDirection="column" borderStyle="round" borderColor={THEME.error} paddingX={1}>
-          <Text color={THEME.error} bold>Provider Error</Text>
+        <Box
+          marginTop={1}
+          flexDirection="column"
+          borderStyle="round"
+          borderColor={THEME.error}
+          paddingX={1}
+        >
+          <Text color={THEME.error} bold>
+            Provider Error
+          </Text>
           <Text color={THEME.dim}>Nightfall cannot connect to the configured provider.</Text>
-          {troubleshootingHint && (
-            <Text color={THEME.dim}>Fix: {troubleshootingHint}</Text>
-          )}
+          {troubleshootingHint && <Text color={THEME.dim}>Fix: {troubleshootingHint}</Text>}
           <Text color={THEME.dim}>Then restart Nightfall.</Text>
         </Box>
       )}

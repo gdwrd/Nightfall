@@ -9,8 +9,8 @@ export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   'deepseek-r1:32b': 32_768,
   'llama3.1': 131_072,
   'llama3.2': 131_072,
-  'llama3': 8_192,
-  'openrouter': 32_768,
+  llama3: 8_192,
+  openrouter: 32_768,
 };
 
 /**

@@ -29,7 +29,7 @@ export const readMemoryTool: ToolImpl = {
     }
 
     const resolved = file === 'index' ? 'index.md' : file;
-    const namespace = ctx.memoryNamespace ?? await deriveProjectSlug(ctx.projectRoot);
+    const namespace = ctx.memoryNamespace ?? (await deriveProjectSlug(ctx.projectRoot));
     const manager = new MemoryManager(ctx.projectRoot, namespace);
 
     try {
@@ -54,6 +54,6 @@ export const readMemoryTool: ToolImpl = {
   },
 };
 
-export const parameterSchema: ParameterSchema[] = Object.entries(readMemoryTool.definition.parameters).map(
-  ([name, def]) => ({ name, ...def }),
-);
+export const parameterSchema: ParameterSchema[] = Object.entries(
+  readMemoryTool.definition.parameters,
+).map(([name, def]) => ({ name, ...def }));

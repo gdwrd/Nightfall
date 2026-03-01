@@ -17,9 +17,7 @@ export function resolveAndValidatePath(filePath: string, projectRoot: string): s
 
   // Ensure resolved path is within projectRoot (must start with root + sep, or equal root)
   if (resolved !== root && !resolved.startsWith(root + path.sep)) {
-    throw new Error(
-      `Path "${filePath}" resolves outside the project root and cannot be accessed`,
-    );
+    throw new Error(`Path "${filePath}" resolves outside the project root and cannot be accessed`);
   }
 
   return resolved;

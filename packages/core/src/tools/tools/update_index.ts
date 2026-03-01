@@ -41,7 +41,7 @@ export const updateIndexTool: ToolImpl = {
       };
     }
 
-    const namespace = ctx.memoryNamespace ?? await deriveProjectSlug(ctx.projectRoot);
+    const namespace = ctx.memoryNamespace ?? (await deriveProjectSlug(ctx.projectRoot));
     const manager = new MemoryManager(ctx.projectRoot, namespace);
 
     try {
@@ -83,6 +83,6 @@ export const updateIndexTool: ToolImpl = {
   },
 };
 
-export const parameterSchema: ParameterSchema[] = Object.entries(updateIndexTool.definition.parameters).map(
-  ([name, def]) => ({ name, ...def }),
-);
+export const parameterSchema: ParameterSchema[] = Object.entries(
+  updateIndexTool.definition.parameters,
+).map(([name, def]) => ({ name, ...def }));

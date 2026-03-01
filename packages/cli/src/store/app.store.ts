@@ -1,5 +1,13 @@
 import { useReducer } from 'react';
-import type { TaskRun, AgentState, FileLock, ProviderLifecycleEvent, SnapshotMeta, NightfallConfig, TokenUsage } from '@nightfall/shared';
+import type {
+  TaskRun,
+  AgentState,
+  FileLock,
+  ProviderLifecycleEvent,
+  SnapshotMeta,
+  NightfallConfig,
+  TokenUsage,
+} from '@nightfall/shared';
 import type { AppAction } from './app.actions.js';
 
 // ---------------------------------------------------------------------------
@@ -190,7 +198,14 @@ export function reducer(state: AppState, action: AppAction): AppState {
       return { ...state, phase: action.phase };
 
     case 'RESET_TASK':
-      return { ...state, activeRun: null, agentStates: {}, locks: [], slashOutput: null, lastTaskTokens: null };
+      return {
+        ...state,
+        activeRun: null,
+        agentStates: {},
+        locks: [],
+        slashOutput: null,
+        lastTaskTokens: null,
+      };
 
     case 'UPDATE_PLAN':
       return {

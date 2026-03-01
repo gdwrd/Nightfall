@@ -1,6 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Box, Text, useApp, useInput, useStdout } from 'ink';
-import type { NightfallConfig, TaskRun, AgentState, FileLock, SnapshotMeta } from '@nightfall/shared';
+import type {
+  NightfallConfig,
+  TaskRun,
+  AgentState,
+  FileLock,
+  SnapshotMeta,
+} from '@nightfall/shared';
 import type { ProviderLifecycleEvent } from '@nightfall/shared';
 import type { IOrchestrator } from '../ws.client.js';
 import { THEME } from '../theme.js';
@@ -225,7 +231,8 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
                 data: {
                   sessionId: '', // No session yet — will be set when start responds
                   status: 'asking_idea',
-                  currentQuestion: 'What would you like to build? Describe your idea in a few sentences.',
+                  currentQuestion:
+                    'What would you like to build? Describe your idea in a few sentences.',
                   questionNumber: 0,
                   history: [],
                 },
@@ -244,7 +251,10 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
                     currentQuestion: data.question as string,
                     questionNumber: data.questionNumber as number,
                     history: [
-                      { role: 'assistant' as const, content: 'What would you like to build? Describe your idea.' },
+                      {
+                        role: 'assistant' as const,
+                        content: 'What would you like to build? Describe your idea.',
+                      },
                       { role: 'user' as const, content: data.idea as string },
                     ],
                   },
@@ -275,7 +285,10 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
                 type: 'UPDATE_NEW_PROJECT',
                 partial: { status: 'compiling_spec', currentQuestion: null },
               });
-              orchestrator.sendSlashCommand('/new-project', `generate-spec ${data.sessionId as string}`);
+              orchestrator.sendSlashCommand(
+                '/new-project',
+                `generate-spec ${data.sessionId as string}`,
+              );
               return;
 
             case 'new_project_spec_saved':
@@ -393,10 +406,7 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
         dispatch({
           type: 'UPDATE_NEW_PROJECT',
           partial: {
-            history: [
-              ...state.newProjectData.history,
-              { role: 'user' as const, content: input },
-            ],
+            history: [...state.newProjectData.history, { role: 'user' as const, content: input }],
           },
         });
         orchestrator.sendSlashCommand('/new-project', `answer ${sessionId} ${input}`);
@@ -502,7 +512,12 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
     }
 
     // Submit new task
-    if (phase === 'idle' || phase === 'completed' || phase === 'answered' || phase === 'awaiting_approval') {
+    if (
+      phase === 'idle' ||
+      phase === 'completed' ||
+      phase === 'answered' ||
+      phase === 'awaiting_approval'
+    ) {
       dispatch({ type: 'RESET_TASK' });
       const ac = new AbortController();
       abortControllerRef.current = ac;
@@ -523,7 +538,10 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
       ? 'new_project_plan'
       : phase === 'new_project'
         ? 'new_project'
-        : phase === 'running' || phase === 'planning' || phase === 'editing_plan' || phase === 'classifying'
+        : phase === 'running' ||
+            phase === 'planning' ||
+            phase === 'editing_plan' ||
+            phase === 'classifying'
           ? 'running'
           : phase === 'awaiting_approval'
             ? 'plan_approval'

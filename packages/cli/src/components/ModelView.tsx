@@ -83,7 +83,13 @@ export const ModelView: React.FC<ModelViewProps> = ({
   const remaining = filtered.length - (scrollOffset + VISIBLE_ROWS);
 
   return (
-    <Box flexDirection="column" borderStyle="single" borderColor={THEME.accent} paddingX={2} paddingY={1}>
+    <Box
+      flexDirection="column"
+      borderStyle="single"
+      borderColor={THEME.accent}
+      paddingX={2}
+      paddingY={1}
+    >
       <Text bold color={THEME.primary}>
         ◆ MODEL PICKER — {provider.toUpperCase()}
       </Text>
@@ -93,7 +99,10 @@ export const ModelView: React.FC<ModelViewProps> = ({
         <Text color={THEME.dim}>filter: </Text>
         <Text color={THEME.text}>{filter}</Text>
         <Text color={THEME.primary}>▌</Text>
-        <Text color={THEME.dim}>  ({filtered.length} of {models.length})</Text>
+        <Text color={THEME.dim}>
+          {' '}
+          ({filtered.length} of {models.length})
+        </Text>
       </Box>
 
       {/* Model list */}
@@ -118,11 +127,9 @@ export const ModelView: React.FC<ModelViewProps> = ({
       </Box>
 
       {/* Scroll hint */}
-      {remaining > 0 && (
-        <Text color={THEME.dim}>  ↓ {remaining} more</Text>
-      )}
+      {remaining > 0 && <Text color={THEME.dim}> ↓ {remaining} more</Text>}
       {filtered.length > VISIBLE_ROWS && remaining <= 0 && (
-        <Text color={THEME.dim}>  (end of list)</Text>
+        <Text color={THEME.dim}> (end of list)</Text>
       )}
 
       {/* Key hints */}

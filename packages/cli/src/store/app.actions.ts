@@ -6,7 +6,12 @@ import type {
   ProviderLifecycleEvent,
   SnapshotMeta,
 } from '@nightfall/shared';
-import type { AppPhase, ModelViewData, SettingsViewData, NewProjectWizardData } from './app.store.js';
+import type {
+  AppPhase,
+  ModelViewData,
+  SettingsViewData,
+  NewProjectWizardData,
+} from './app.store.js';
 
 // ---------------------------------------------------------------------------
 // Action Types

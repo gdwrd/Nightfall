@@ -76,7 +76,4 @@ export {
   SPEC_COMPILATION_PROMPT,
   DEV_PLAN_PROMPT,
 } from './new-project/index.js';
-export type {
-  NewProjectSession,
-  SessionStatus,
-} from './new-project/index.js';
+export type { NewProjectSession, SessionStatus } from './new-project/index.js';

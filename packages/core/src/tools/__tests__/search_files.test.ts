@@ -21,10 +21,7 @@ beforeAll(async () => {
   );
   await fs.writeFile(path.join(tmpDir, 'beta.ts'), 'export class World {}\n');
   await fs.mkdir(path.join(tmpDir, 'node_modules'));
-  await fs.writeFile(
-    path.join(tmpDir, 'node_modules', 'skip.ts'),
-    'TODO: should not be found\n',
-  );
+  await fs.writeFile(path.join(tmpDir, 'node_modules', 'skip.ts'), 'TODO: should not be found\n');
   await fs.mkdir(path.join(tmpDir, '.git'));
   await fs.writeFile(path.join(tmpDir, '.git', 'index'), 'TODO: git internal\n');
 });

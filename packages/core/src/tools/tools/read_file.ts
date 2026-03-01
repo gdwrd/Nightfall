@@ -176,6 +176,6 @@ export const readFileTool: ToolImpl = {
   },
 };
 
-export const parameterSchema: ParameterSchema[] = Object.entries(readFileTool.definition.parameters).map(
-  ([name, def]) => ({ name, ...def }),
-);
+export const parameterSchema: ParameterSchema[] = Object.entries(
+  readFileTool.definition.parameters,
+).map(([name, def]) => ({ name, ...def }));

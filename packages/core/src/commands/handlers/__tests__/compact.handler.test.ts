@@ -61,7 +61,10 @@ describe('compactHandler', () => {
 
   describe('with memory files', () => {
     beforeEach(async () => {
-      await createMemoryFile('patterns.md', '# Patterns\n\n- pattern 1\n- pattern 2\n- duplicate\n- duplicate\n');
+      await createMemoryFile(
+        'patterns.md',
+        '# Patterns\n\n- pattern 1\n- pattern 2\n- duplicate\n- duplicate\n',
+      );
       await createMemoryFile('progress.md', '# Progress\n\n- old entry\n- older entry\n');
     });
 

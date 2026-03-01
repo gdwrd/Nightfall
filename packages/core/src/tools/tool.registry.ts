@@ -21,8 +21,23 @@ import { updateIndexTool } from './tools/update_index.js';
 
 /** Map of which tools each agent role may call */
 const ROLE_TOOLS: Record<AgentRole, string[]> = {
-  'team-lead': ['read_memory', 'read_file', 'list_files', 'search_files', 'assign_task', 'request_review'],
-  engineer: ['read_memory', 'read_file', 'write_diff', 'write_file', 'list_files', 'search_files', 'run_command'],
+  'team-lead': [
+    'read_memory',
+    'read_file',
+    'list_files',
+    'search_files',
+    'assign_task',
+    'request_review',
+  ],
+  engineer: [
+    'read_memory',
+    'read_file',
+    'write_diff',
+    'write_file',
+    'list_files',
+    'search_files',
+    'run_command',
+  ],
   reviewer: ['read_memory', 'read_file', 'list_files', 'search_files', 'run_command'],
   'memory-manager': ['read_file', 'write_memory', 'update_index'],
   classifier: [],

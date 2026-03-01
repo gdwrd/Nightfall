@@ -125,11 +125,11 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
         </Text>
         <Box marginTop={1} flexDirection="column">
           <Box>
-            <Text color={THEME.textDim}>Prompt:  </Text>
+            <Text color={THEME.textDim}>Prompt: </Text>
             <Text color={THEME.text}>{run.prompt.replace(/\n/g, ' ').trim()}</Text>
           </Box>
           <Box>
-            <Text color={THEME.textDim}>Status:  </Text>
+            <Text color={THEME.textDim}>Status: </Text>
             <Text color={statusColor(run.status)}>
               {statusIcon(run.status)} {run.status}
             </Text>
@@ -184,8 +184,10 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
           return (
             <Box key={run.id}>
               <Text color={isSelected ? THEME.primary : THEME.textDim}>
-                {isSelected ? '▶ ' : '  '}[{num}] {date}{'  '}
-                {prompt.padEnd(40)}{'  '}
+                {isSelected ? '▶ ' : '  '}[{num}] {date}
+                {'  '}
+                {prompt.padEnd(40)}
+                {'  '}
                 {icon} {run.status.padEnd(12)} {dur}
               </Text>
             </Box>

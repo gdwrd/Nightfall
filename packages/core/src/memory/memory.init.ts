@@ -31,7 +31,11 @@ const SKIP_DIRS = new Set([
  */
 export async function deriveProjectSlug(projectRoot: string): Promise<string> {
   const rawName = path.basename(projectRoot);
-  const slug = rawName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'project';
+  const slug =
+    rawName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'project';
   try {
     const { stdout } = await execAsync('git rev-parse HEAD', {
       cwd: projectRoot,

@@ -33,7 +33,7 @@ export const writeMemoryTool: ToolImpl = {
       };
     }
 
-    const namespace = ctx.memoryNamespace ?? await deriveProjectSlug(ctx.projectRoot);
+    const namespace = ctx.memoryNamespace ?? (await deriveProjectSlug(ctx.projectRoot));
     const manager = new MemoryManager(ctx.projectRoot, namespace);
 
     try {
@@ -50,6 +50,6 @@ export const writeMemoryTool: ToolImpl = {
   },
 };
 
-export const parameterSchema: ParameterSchema[] = Object.entries(writeMemoryTool.definition.parameters).map(
-  ([name, def]) => ({ name, ...def }),
-);
+export const parameterSchema: ParameterSchema[] = Object.entries(
+  writeMemoryTool.definition.parameters,
+).map(([name, def]) => ({ name, ...def }));

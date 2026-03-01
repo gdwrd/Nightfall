@@ -90,10 +90,7 @@ describe('ToolRegistry', () => {
 
     it('returns structured error for wrong type on required parameter', async () => {
       const ctx = makeCtx('engineer');
-      const result = await registry.execute(
-        { tool: 'read_file', parameters: { path: 42 } },
-        ctx,
-      );
+      const result = await registry.execute({ tool: 'read_file', parameters: { path: 42 } }, ctx);
       expect(result.success).toBe(false);
       expect(result.error).toMatch(/"path" must be string/i);
     });

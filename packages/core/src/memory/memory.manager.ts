@@ -17,7 +17,10 @@ const PROGRESS_FILE = 'progress.md';
 export class MemoryManager {
   private readonly namespace: string | undefined;
 
-  constructor(private projectRoot: string, namespace?: string) {
+  constructor(
+    private projectRoot: string,
+    namespace?: string,
+  ) {
     this.namespace = namespace;
   }
 

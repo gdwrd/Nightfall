@@ -163,6 +163,6 @@ function truncateOutput(output: string): string {
   return `${output.slice(0, HEAD)}\n[... ${omitted} bytes omitted ...]\n${output.slice(-TAIL)}`;
 }
 
-export const parameterSchema: ParameterSchema[] = Object.entries(runCommandTool.definition.parameters).map(
-  ([name, def]) => ({ name, ...def }),
-);
+export const parameterSchema: ParameterSchema[] = Object.entries(
+  runCommandTool.definition.parameters,
+).map(([name, def]) => ({ name, ...def }));

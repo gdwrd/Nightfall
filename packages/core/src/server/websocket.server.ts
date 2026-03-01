@@ -158,13 +158,16 @@ export class NightfallServer extends EventEmitter {
       case 'SUBMIT_TASK': {
         const ac = new AbortController();
         this.activeAbortControllers.push(ac);
-        this.orchestrator.submitTask(msg.payload.prompt, ac.signal).catch((err: unknown) => {
-          const message = err instanceof Error ? err.message : String(err);
-          this.broadcaster.send(ws, { type: 'ERROR', payload: { message } });
-        }).finally(() => {
-          const idx = this.activeAbortControllers.indexOf(ac);
-          if (idx !== -1) this.activeAbortControllers.splice(idx, 1);
-        });
+        this.orchestrator
+          .submitTask(msg.payload.prompt, ac.signal)
+          .catch((err: unknown) => {
+            const message = err instanceof Error ? err.message : String(err);
+            this.broadcaster.send(ws, { type: 'ERROR', payload: { message } });
+          })
+          .finally(() => {
+            const idx = this.activeAbortControllers.indexOf(ac);
+            if (idx !== -1) this.activeAbortControllers.splice(idx, 1);
+          });
         break;
       }
 

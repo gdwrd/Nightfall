@@ -523,13 +523,7 @@ describe('MemoryManager with namespace', () => {
 
     await manager.appendToProgress('Task completed');
 
-    const progressPath = path.join(
-      TEST_ROOT,
-      '.nightfall',
-      'memory',
-      'progress-ns',
-      'progress.md',
-    );
+    const progressPath = path.join(TEST_ROOT, '.nightfall', 'memory', 'progress-ns', 'progress.md');
     expect(fs.existsSync(progressPath)).toBe(true);
     const content = fs.readFileSync(progressPath, 'utf8');
     expect(content).toContain('Task completed');

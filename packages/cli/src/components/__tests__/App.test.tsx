@@ -102,7 +102,11 @@ describe('App', () => {
     await flushEffects();
 
     // Emit model_ready event — triggers LIFECYCLE_EVENT dispatch → phase=idle
-    orchestrator.emit('lifecycle', { type: 'model_ready', model: 'deepseek-r1', contextLength: 16384 });
+    orchestrator.emit('lifecycle', {
+      type: 'model_ready',
+      model: 'deepseek-r1',
+      contextLength: 16384,
+    });
 
     // Wait for re-render
     await flushEffects();

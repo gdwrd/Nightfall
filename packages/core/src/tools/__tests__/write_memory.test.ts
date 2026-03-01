@@ -33,10 +33,7 @@ describe('write_memory tool', () => {
       ctx(),
     );
     expect(result.success).toBe(true);
-    const written = await fs.readFile(
-      path.join(memDir, 'patterns.md'),
-      'utf-8',
-    );
+    const written = await fs.readFile(path.join(memDir, 'patterns.md'), 'utf-8');
     expect(written).toContain('use async/await');
   });
 
@@ -62,10 +59,7 @@ describe('write_memory tool', () => {
   });
 
   it('returns success message with filename', async () => {
-    const result = await writeMemoryTool.execute(
-      { file: 'notes.md', content: '# Notes\n' },
-      ctx(),
-    );
+    const result = await writeMemoryTool.execute({ file: 'notes.md', content: '# Notes\n' }, ctx());
     expect(result.success).toBe(true);
     expect(result.output).toContain('notes.md');
   });

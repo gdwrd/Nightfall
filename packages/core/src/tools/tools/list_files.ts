@@ -107,6 +107,6 @@ export const listFilesTool: ToolImpl = {
   },
 };
 
-export const parameterSchema: ParameterSchema[] = Object.entries(listFilesTool.definition.parameters).map(
-  ([name, def]) => ({ name, ...def }),
-);
+export const parameterSchema: ParameterSchema[] = Object.entries(
+  listFilesTool.definition.parameters,
+).map(([name, def]) => ({ name, ...def }));

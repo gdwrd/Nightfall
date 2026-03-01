@@ -220,7 +220,10 @@ export interface AgentFactoryOptions {
   projectRoot: string;
   /** Override any agent's system prompt with a custom one. */
   customPrompts?: Partial<
-    Record<'team-lead' | 'engineer' | 'reviewer' | 'memory-manager' | 'classifier' | 'responder', string>
+    Record<
+      'team-lead' | 'engineer' | 'reviewer' | 'memory-manager' | 'classifier' | 'responder',
+      string
+    >
   >;
   /**
    * Approximate token budget for agent conversation history.

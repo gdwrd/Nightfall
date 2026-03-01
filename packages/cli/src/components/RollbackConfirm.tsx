@@ -68,8 +68,10 @@ export const RollbackConfirm: React.FC<RollbackConfirmProps> = ({
             <Box key={snap.snapshotId}>
               <Text color={isTarget ? THEME.primary : THEME.textDim}>
                 {isTarget ? '  → ' : '    '}
-                {snap.snapshotId}{'  '}
-                {formatDate(snap.timestamp)}{'  '}
+                {snap.snapshotId}
+                {'  '}
+                {formatDate(snap.timestamp)}
+                {'  '}
                 {truncate(snap.prompt, 36)}
                 {isTarget ? '  ← target' : ''}
               </Text>

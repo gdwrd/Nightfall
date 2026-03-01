@@ -147,7 +147,12 @@ describe('AgentGrid', () => {
 
   it('shows waiting placeholder when no action and no log entries', () => {
     const agentStates: Record<string, AgentState> = {
-      'engineer-1': makeAgentState({ id: 'engineer-1', status: 'idle', currentAction: null, log: [] }),
+      'engineer-1': makeAgentState({
+        id: 'engineer-1',
+        status: 'idle',
+        currentAction: null,
+        log: [],
+      }),
     };
     const { lastFrame } = render(<AgentGrid agentStates={agentStates} engineerCount={1} />);
     expect(lastFrame()!).toContain('waiting');

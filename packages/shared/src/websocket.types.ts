@@ -43,6 +43,14 @@ export type ServerMessage =
   | { type: 'PLAN_READY'; payload: TaskPlan }
   | { type: 'AGENT_UPDATE'; payload: AgentState }
   | { type: 'LOCK_UPDATE'; payload: FileLock[] }
-  | { type: 'TASK_COMPLETE'; payload: { status: TaskStatus; summary: string; warnings?: string[]; tokenUsage?: TokenUsage } }
+  | {
+      type: 'TASK_COMPLETE';
+      payload: {
+        status: TaskStatus;
+        summary: string;
+        warnings?: string[];
+        tokenUsage?: TokenUsage;
+      };
+    }
   | { type: 'SLASH_RESULT'; payload: { command: string; output: string } }
   | { type: 'ERROR'; payload: { message: string } };

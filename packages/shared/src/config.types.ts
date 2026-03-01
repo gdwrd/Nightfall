@@ -17,7 +17,10 @@ export interface AnthropicProviderConfig {
   api_key?: string;
 }
 
-export type ProviderConfig = OllamaProviderConfig | OpenRouterProviderConfig | AnthropicProviderConfig;
+export type ProviderConfig =
+  | OllamaProviderConfig
+  | OpenRouterProviderConfig
+  | AnthropicProviderConfig;
 
 export interface AgentIterationOverrides {
   /** Maximum number of LLM round-trips before the agent gives up. */
@@ -54,8 +57,8 @@ export interface NightfallConfig {
    */
   agents?: {
     'team-lead'?: AgentIterationOverrides;
-    'engineer'?: AgentIterationOverrides;
-    'reviewer'?: AgentIterationOverrides;
+    engineer?: AgentIterationOverrides;
+    reviewer?: AgentIterationOverrides;
     'memory-manager'?: AgentIterationOverrides;
   };
 }

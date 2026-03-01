@@ -91,8 +91,11 @@ async function collectMemoryFiles(dir: string, relBase: string, depth = 0): Prom
   return results;
 }
 
-async function renderMemorySection(projectRoot: string, namespaceOverride?: string): Promise<string> {
-  const namespace = namespaceOverride ?? await deriveProjectSlug(projectRoot);
+async function renderMemorySection(
+  projectRoot: string,
+  namespaceOverride?: string,
+): Promise<string> {
+  const namespace = namespaceOverride ?? (await deriveProjectSlug(projectRoot));
   const memoryDir = path.join(projectRoot, '.nightfall', 'memory', namespace);
 
   const mdFiles = await collectMemoryFiles(memoryDir, '');
@@ -131,15 +134,8 @@ async function renderMemorySection(projectRoot: string, namespaceOverride?: stri
  * /export --history   → history only
  * /export --memory    → memory only
  */
-export async function exportHandler(
-  ctx: CommandDispatcherContext,
-  args: string,
-): Promise<string> {
-  const flags = args
-    .trim()
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean);
+export async function exportHandler(ctx: CommandDispatcherContext, args: string): Promise<string> {
+  const flags = args.trim().toLowerCase().split(/\s+/).filter(Boolean);
 
   const includeHistory = flags.length === 0 || flags.includes('--history');
   const includeMemory = flags.length === 0 || flags.includes('--memory');
@@ -150,10 +146,7 @@ export async function exportHandler(
     .replace(/:/g, '-')
     .replace(/\.\d+Z$/, '');
 
-  const sections: string[] = [
-    `# Nightfall Export — ${projectName} — ${timestamp}`,
-    '',
-  ];
+  const sections: string[] = [`# Nightfall Export — ${projectName} — ${timestamp}`, ''];
 
   if (includeHistory) {
     const logger = new TaskLogger(ctx.projectRoot);
