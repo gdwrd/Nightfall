@@ -371,10 +371,10 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
 
       if (status === 'gathering') {
         if (input.toLowerCase() === '/done') {
-          dispatch({
-            type: 'UPDATE_NEW_PROJECT',
-            partial: { status: 'compiling_spec', currentQuestion: null },
-          });
+          // Don't optimistically set status to 'compiling_spec' here — let the
+          // server response ('new_project_gathering_complete') drive the
+          // transition. Otherwise a server-side error (e.g. "no answers yet")
+          // causes a brief spinner flash before the error clears the wizard.
           orchestrator.sendSlashCommand('/new-project', `done ${sessionId}`);
           return;
         }

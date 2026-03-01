@@ -446,8 +446,12 @@ describe('integration: error scenarios', () => {
     const sid = start.sessionId as string;
 
     const result = parse(await newProjectHandler(ctx, `answer ${sid} My answer`));
-    expect(result.type).toBe('new_project_error');
-    expect(result.message).toContain('LLM service unavailable');
+    // Session is preserved on LLM failure — returns a question-type response
+    // so the CLI stays in gathering mode and the user can retry.
+    expect(result.type).toBe('new_project_question');
+    expect(result.sessionId).toBe(sid);
+    expect(result.question).toContain('LLM error');
+    expect(result.question).toContain('LLM service unavailable');
   });
 
   it('handles LLM failure during spec generation gracefully', async () => {

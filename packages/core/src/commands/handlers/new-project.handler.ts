@@ -96,9 +96,16 @@ async function handleAnswer(
   try {
     response = await collectResponse(provider, messages);
   } catch (err) {
-    // Clean up session so the user isn't permanently locked out of the wizard
-    sessionManager.delete(session.id);
-    throw err;
+    // Keep session alive so accumulated Q&A history isn't lost on a transient
+    // LLM failure. Return a question-type response so the CLI stays in
+    // gathering mode and the user can retry their answer.
+    const errMsg = err instanceof Error ? err.message : String(err);
+    return JSON.stringify({
+      type: 'new_project_question',
+      sessionId: session.id,
+      questionNumber: session.questionCount,
+      question: `LLM error: ${errMsg}\nPlease try submitting your answer again.`,
+    });
   }
 
   // Record only after successful LLM call
