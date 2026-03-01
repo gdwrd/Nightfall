@@ -763,9 +763,9 @@ To avoid overloading the task status flow, the simplest approach is to have the 
 
 ### Task 7: Integration Tests
 
-- [ ] Create `packages/core/src/commands/handlers/__tests__/new-project.handler.test.ts` with handler integration tests
-- [ ] Test all sub-command flows (start, answer, done, generate-spec, generate-plan, cancel, errors)
-- [ ] All tests and lint pass
+- [x] Create `packages/core/src/commands/handlers/__tests__/new-project.handler.test.ts` with handler integration tests
+- [x] Test all sub-command flows (start, answer, done, generate-spec, generate-plan, cancel, errors)
+- [x] All tests and lint pass
 
 ### Files to Create
 
