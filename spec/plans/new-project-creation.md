@@ -61,6 +61,15 @@ The feature uses the existing `SLASH_COMMAND` / `SLASH_RESULT` WebSocket flow wi
 
 ## Phase 1 — Session & Prompts
 
+### Task 1: Session & Prompts
+
+- [x] Create `packages/core/src/new-project/new-project.session.ts` with `NewProjectSession` interface, `NewProjectSessionManager` class, and `deriveSlug` helper
+- [x] Create `packages/core/src/new-project/new-project.prompts.ts` with `SPEC_BUILDER_SYSTEM_PROMPT`, `SPEC_COMPILATION_PROMPT`, and `DEV_PLAN_PROMPT`
+- [x] Create `packages/core/src/new-project/index.ts` barrel export
+- [x] Add new-project exports to `packages/core/src/index.ts`
+- [x] Write unit tests for session manager and slug derivation
+- [x] All tests and lint pass
+
 ### Files to Create
 
 #### `packages/core/src/new-project/new-project.session.ts`
@@ -194,6 +203,15 @@ Barrel export for the module.
 ---
 
 ## Phase 2 — Command Handler
+
+### Task 2: Command Handler
+
+- [ ] Create `packages/core/src/commands/handlers/new-project.handler.ts` with sub-command routing (start, answer, done, generate-spec, generate-plan, cancel)
+- [ ] Add `provider` to `CommandDispatcherContext` interface
+- [ ] Register `/new-project` case in `command.dispatcher.ts`
+- [ ] Update `NightfallServer` to pass provider to dispatcher context
+- [ ] Write unit tests for the handler
+- [ ] All tests and lint pass
 
 ### Files to Create
 
@@ -343,6 +361,13 @@ Update `NightfallServer` where it creates the `CommandDispatcherContext` to pass
 
 ## Phase 3 — CLI State & Actions
 
+### Task 3: CLI State & Actions
+
+- [ ] Add `new_project` to `AppPhase` type and `NewProjectWizardData` interface to `app.store.ts`
+- [ ] Add `SET_NEW_PROJECT`, `UPDATE_NEW_PROJECT`, `CLEAR_NEW_PROJECT` reducer cases
+- [ ] Add new action types to `app.actions.ts`
+- [ ] All tests and lint pass
+
 ### Files to Modify
 
 #### `packages/cli/src/store/app.store.ts`
@@ -402,6 +427,13 @@ export type AppAction =
 
 ## Phase 4 — NewProjectWizard Component
 
+### Task 4: NewProjectWizard Component
+
+- [ ] Create `packages/cli/src/components/NewProjectWizard.tsx` with full wizard UI
+- [ ] Render Q&A history, current question, spinner during compilation, plan confirmation
+- [ ] Handle `/done` and `/cancel` interception
+- [ ] All tests and lint pass
+
 ### Files to Create
 
 #### `packages/cli/src/components/NewProjectWizard.tsx`
@@ -452,6 +484,15 @@ interface NewProjectWizardProps {
 ---
 
 ## Phase 5 — App.tsx Integration
+
+### Task 5: App.tsx Integration
+
+- [ ] Add slash result handling for `/new-project` in `App.tsx`
+- [ ] Add input handling for wizard mode in `App.tsx`
+- [ ] Add render section for the wizard component in `App.tsx`
+- [ ] Add `new_project` and `new_project_plan` input modes to `InputBar.tsx`
+- [ ] Register `/new-project` in `slash.commands.ts`
+- [ ] All tests and lint pass
 
 ### Files to Modify
 
@@ -654,6 +695,13 @@ export const SLASH_COMMANDS: Record<string, string> = {
 
 ## Phase 6 — Natural Language Trigger
 
+### Task 6: Natural Language Trigger
+
+- [ ] Update classifier prompt in `agent.factory.ts` to detect `new_project` intent
+- [ ] Update `parseClassification()` and `submitTask()` in `task.orchestrator.ts` to route `new_project` intent
+- [ ] Implement `routeToNewProject` method on orchestrator
+- [ ] All tests and lint pass
+
 Allow users to start the new-project flow by simply typing something like "I want to build a task management app" without using `/new-project`.
 
 ### Approach
@@ -712,6 +760,12 @@ To avoid overloading the task status flow, the simplest approach is to have the 
 ---
 
 ## Phase 7 — Tests
+
+### Task 7: Integration Tests
+
+- [ ] Create `packages/core/src/commands/handlers/__tests__/new-project.handler.test.ts` with handler integration tests
+- [ ] Test all sub-command flows (start, answer, done, generate-spec, generate-plan, cancel, errors)
+- [ ] All tests and lint pass
 
 ### Files to Create
 
