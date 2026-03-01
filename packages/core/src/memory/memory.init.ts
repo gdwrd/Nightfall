@@ -3,7 +3,13 @@ import type { Dirent } from 'node:fs';
 import path from 'node:path';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
-import type { MemoryIndex, MemoryIndexEntry, MemoryComponentEntry } from '@nightfall/shared';
+import type {
+  MemoryIndex,
+  MemoryIndexEntry,
+  MemoryComponentEntry,
+  ProviderAdapter,
+  ChatMessage,
+} from '@nightfall/shared';
 import { MemoryManager } from './memory.manager.js';
 
 const execAsync = promisify(exec);
@@ -144,6 +150,224 @@ export async function initializeMemoryBank(projectRoot: string): Promise<InitRes
 
   return { filesCreated };
 }
+
+// ---------------------------------------------------------------------------
+// LLM-powered init helpers
+// ---------------------------------------------------------------------------
+
+async function buildFolderTree(projectRoot: string, maxDepth = 2, depth = 0): Promise<string[]> {
+  if (depth >= maxDepth) return [];
+  const lines: string[] = [];
+  let entries: Dirent[];
+  try {
+    entries = await fs.readdir(projectRoot, { withFileTypes: true, encoding: 'utf8' });
+  } catch (_err) {
+    return [];
+  }
+  for (const entry of entries) {
+    if (SKIP_DIRS.has(entry.name)) continue;
+    const indent = '  '.repeat(depth);
+    if (entry.isDirectory()) {
+      lines.push(`${indent}${entry.name}/`);
+      const children = await buildFolderTree(
+        path.join(projectRoot, entry.name),
+        maxDepth,
+        depth + 1,
+      );
+      lines.push(...children);
+    } else {
+      lines.push(`${indent}${entry.name}`);
+    }
+  }
+  return lines;
+}
+
+async function readFileTruncated(filePath: string, maxChars = 4000): Promise<string> {
+  try {
+    const content = await fs.readFile(filePath, 'utf8');
+    return content.length > maxChars ? content.slice(0, maxChars) + '\n...(truncated)' : content;
+  } catch (_err) {
+    return '';
+  }
+}
+
+async function gatherProjectContext(projectRoot: string, info: ProjectInfo): Promise<string> {
+  const parts: string[] = [];
+
+  // Folder tree (2 levels)
+  const tree = await buildFolderTree(projectRoot);
+  if (tree.length > 0) {
+    parts.push('## Directory Structure\n```\n' + tree.join('\n') + '\n```');
+  }
+
+  // Key files — package.json always first
+  const keyFiles: string[] = [];
+  const candidateFiles = [
+    'package.json',
+    'CLAUDE.md',
+    'AI.md',
+    'CONTRIBUTING.md',
+    'go.mod',
+    'requirements.txt',
+    'Cargo.toml',
+    'pyproject.toml',
+  ];
+  for (const f of candidateFiles) {
+    try {
+      await fs.access(path.join(projectRoot, f));
+      keyFiles.push(f);
+    } catch (_err) {
+      // not present
+    }
+  }
+  // Add entry points from package.json
+  for (const ep of info.entryPoints.slice(0, 2)) {
+    if (!keyFiles.includes(ep)) keyFiles.push(ep);
+  }
+
+  // Read up to 5 key files
+  let fileCount = 0;
+  for (const rel of keyFiles) {
+    if (fileCount >= 5) break;
+    const content = await readFileTruncated(path.join(projectRoot, rel));
+    if (content) {
+      parts.push(`## ${rel}\n\`\`\`\n${content}\n\`\`\``);
+      fileCount++;
+    }
+  }
+
+  return parts.join('\n\n');
+}
+
+async function collectResponse(
+  provider: ProviderAdapter,
+  messages: ChatMessage[],
+): Promise<string> {
+  let full = '';
+  for await (const chunk of provider.complete(messages)) {
+    full += chunk;
+  }
+  return full.trim();
+}
+
+const INIT_SYSTEM_PROMPT = `You are initializing the memory bank for an AI coding agent system called Nightfall.
+Agents read these files fresh at the start of every task — write clearly and concisely for an AI reader, not a human.
+
+Output ALL of the following files in this exact delimited format (include all headers exactly as shown):
+
+=== project.md ===
+# Project
+<name, purpose, goals, explicit scope (what's in / what's out)>
+
+=== tech.md ===
+# Tech Stack
+<language, framework, key dependencies, build commands, setup steps, env vars, known constraints>
+
+=== patterns.md ===
+# Patterns & Architecture
+<text-based architecture diagram, naming conventions, design decisions, anti-patterns to avoid>
+
+=== progress.md ===
+# Progress
+<initialization timestamp + one honest note that the bank was just initialized and agents will expand it>
+
+=== components/<name>.md ===
+# <name>
+<what the module does, key exported APIs/classes, file map, gotchas for agents editing it>
+
+Repeat the components section for each significant module discovered in the project.
+Do not output anything outside the delimited sections. Do not add markdown code fences around the sections themselves.`;
+
+function parseInitOutput(
+  output: string,
+): Map<string, string> {
+  const fileMap = new Map<string, string>();
+  // Split on === <filename> === markers
+  const parts = output.split(/^=== (.+?) ===/m);
+  // parts[0] is any text before first marker (ignore)
+  // then [filename, content, filename, content, ...]
+  for (let i = 1; i < parts.length - 1; i += 2) {
+    const filename = parts[i].trim();
+    const content = parts[i + 1].trim();
+    if (filename && content) {
+      fileMap.set(filename, content + '\n');
+    }
+  }
+  return fileMap;
+}
+
+/**
+ * Initialize the memory bank using an LLM to analyze the project and write
+ * meaningful content. Falls back to the static version if the LLM call fails.
+ */
+export async function initializeMemoryBankWithLLM(
+  projectRoot: string,
+  provider: ProviderAdapter,
+): Promise<InitResult> {
+  const namespace = await deriveProjectSlug(projectRoot);
+  const manager = new MemoryManager(projectRoot, namespace);
+  await manager.ensureStructure();
+
+  const projectInfo = await scanProject(projectRoot);
+  const srcModules = await discoverModules(projectRoot, projectInfo.srcDirs);
+
+  let llmFiles: Map<string, string>;
+  try {
+    const context = await gatherProjectContext(projectRoot, projectInfo);
+    const messages: ChatMessage[] = [
+      { role: 'system', content: INIT_SYSTEM_PROMPT },
+      { role: 'user', content: context },
+    ];
+    const output = await collectResponse(provider, messages);
+    llmFiles = parseInitOutput(output);
+  } catch (err) {
+    process.stderr.write(
+      `[init] LLM call failed, falling back to static templates: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+    return initializeMemoryBank(projectRoot);
+  }
+
+  const filesCreated: string[] = [];
+
+  // Build index from discovered modules
+  const index = buildIndex(srcModules);
+  await manager.saveIndex(index);
+  filesCreated.push('index.md');
+
+  // Write LLM-generated files, fall back to static builders for missing ones
+  const staticFallbacks: Record<string, () => string> = {
+    'project.md': () => buildProjectFile(projectInfo),
+    'tech.md': () => buildTechFile(projectInfo),
+    'patterns.md': () => buildPatternsFile(projectInfo),
+    'progress.md': () => buildProgressFile(),
+  };
+
+  for (const [filename, builder] of Object.entries(staticFallbacks)) {
+    const content = llmFiles.get(filename) ?? builder();
+    await manager.updateFile(filename, content);
+    filesCreated.push(filename);
+  }
+
+  // Component files — use LLM output when available, fall back to static
+  for (const mod of srcModules) {
+    const componentPath = `components/${mod.name}.md`;
+    const content = llmFiles.get(componentPath) ?? buildComponentFile(mod);
+    await manager.updateFile(componentPath, content);
+    filesCreated.push(componentPath);
+  }
+
+  // Write any extra component files the LLM generated beyond what we discovered
+  for (const [filename, content] of llmFiles) {
+    if (filename.startsWith('components/') && !filesCreated.includes(filename)) {
+      await manager.updateFile(filename, content);
+      filesCreated.push(filename);
+    }
+  }
+
+  return { filesCreated };
+}
+
+// ---------------------------------------------------------------------------
 
 interface ModuleInfo {
   name: string;

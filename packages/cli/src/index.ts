@@ -65,6 +65,11 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
+  // Start provider lifecycle now that the client is connected, so lifecycle
+  // events (detecting, fatal, model_ready, etc.) are not broadcast into the
+  // void before anyone is listening.
+  server.startLifecycle();
+
   // ── Check memory bank initialization ──────────────────────────────────────
   const memoryInitialized = fs.existsSync(
     path.join(projectRoot, '.nightfall', 'memory', 'index.md'),

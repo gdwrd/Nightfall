@@ -25,16 +25,20 @@ export class OpenRouterAdapter implements ProviderAdapter {
   private readonly model: string;
   private readonly baseURL: string;
   private readonly maxRetries: number;
+  private readonly apiKey: string;
   private _lastUsage: TokenUsage | null = null;
 
   constructor(config: NightfallConfig, baseURL?: string) {
-    const apiKey = process.env.OPENROUTER_API_KEY;
+    const apiKey =
+      (config.provider.name === 'openrouter' ? config.provider.api_key : undefined) ??
+      process.env.OPENROUTER_API_KEY;
     if (!apiKey) {
       throw new Error(
         'OPENROUTER_API_KEY environment variable is required for the openrouter provider',
       );
     }
 
+    this.apiKey = apiKey;
     this.model = config.provider.model;
     this.baseURL = baseURL ?? OPENROUTER_BASE_URL;
     this.maxRetries = config.task.max_retries;
@@ -116,7 +120,7 @@ export class OpenRouterAdapter implements ProviderAdapter {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 5000);
       const response = await fetch(`${this.baseURL}/models`, {
-        headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}` },
+        headers: { Authorization: `Bearer ${this.apiKey}` },
         signal: controller.signal,
       });
       clearTimeout(timeout);

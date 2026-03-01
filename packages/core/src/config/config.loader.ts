@@ -104,6 +104,21 @@ function validateConfig(config: NightfallConfig): void {
   }
 }
 
+/**
+ * Async version of writeConfig — saves the config to ~/.nightfall/config.yaml.
+ * Used by the CLI provider setup wizard.
+ */
+export async function saveConfig(config: NightfallConfig): Promise<void> {
+  if (!fs.existsSync(NIGHTFALL_DIR)) {
+    fs.mkdirSync(NIGHTFALL_DIR, { recursive: true });
+  }
+  await fs.promises.writeFile(
+    CONFIG_PATH,
+    yaml.dump(config as unknown as Record<string, unknown>),
+    'utf8',
+  );
+}
+
 export function writeConfig(config: NightfallConfig): void {
   validateConfig(config);
   if (!fs.existsSync(NIGHTFALL_DIR)) {
@@ -132,10 +147,18 @@ export async function loadConfig(): Promise<NightfallConfig> {
     process.stderr.write(`Created default config at ${CONFIG_PATH}\n`);
   }
 
+  const { provider: userProvider, ...restUserConfig } = userConfig;
   const merged = deepMerge(
     DEFAULT_CONFIG as unknown as Record<string, unknown>,
-    userConfig as Record<string, unknown>,
+    restUserConfig as Record<string, unknown>,
   ) as unknown as NightfallConfig;
+
+  // Apply provider config wholesale — never deep-merge provider objects
+  // because switching providers (e.g. ollama → openrouter) would leak
+  // fields like host/port from the default into the new provider.
+  if (userProvider) {
+    (merged as unknown as Record<string, unknown>).provider = userProvider;
+  }
 
   validateConfig(merged);
   return merged;

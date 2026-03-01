@@ -8,6 +8,8 @@ export interface OllamaProviderConfig {
 export interface OpenRouterProviderConfig {
   name: 'openrouter';
   model: string;
+  /** Optional API key override; defaults to OPENROUTER_API_KEY env var. */
+  api_key?: string;
 }
 
 export interface AnthropicProviderConfig {

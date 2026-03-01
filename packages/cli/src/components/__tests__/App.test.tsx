@@ -206,7 +206,7 @@ describe('App', () => {
     unmount();
   });
 
-  it('shows fatal error panel when fatal lifecycle event received', async () => {
+  it('shows provider setup wizard when fatal lifecycle event received', async () => {
     const { lastFrame, unmount } = render(
       <App
         config={mockConfig}
@@ -218,7 +218,7 @@ describe('App', () => {
 
     await flushEffects();
 
-    // Emit a fatal event — transitions phase to 'error' and sets errorMessage
+    // Emit a fatal event — transitions phase to 'provider_setup' and shows wizard
     orchestrator.emit('lifecycle', {
       type: 'fatal',
       message: 'Unrecoverable startup failure',
@@ -226,8 +226,8 @@ describe('App', () => {
     await flushEffects();
 
     const frame = lastFrame()!;
-    // App renders the fatal error panel
-    expect(frame).toContain('Fatal error');
+    // App renders the provider setup wizard
+    expect(frame).toContain('Provider Setup');
     expect(frame).toContain('Unrecoverable startup failure');
     unmount();
   });

@@ -27,8 +27,10 @@ import { ThinkingPanel } from './ThinkingPanel.js';
 import { ModelView } from './ModelView.js';
 import { SettingsView } from './SettingsView.js';
 import { NewProjectWizard } from './NewProjectWizard.js';
+import { ProviderSetupWizard } from './ProviderSetupWizard.js';
 import { useAppStore } from '../store/app.store.js';
 import type { ModelViewData } from '../store/app.store.js';
+import { saveConfig } from '@nightfall/core';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -554,7 +556,21 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  // Fatal error
+  // Provider setup wizard (shown when provider lifecycle fails fatally)
+  if (phase === 'provider_setup') {
+    return (
+      <ProviderSetupWizard
+        errorMessage={state.providerSetupError ?? ''}
+        onComplete={(providerConfig) => {
+          void saveConfig({ ...config, provider: providerConfig });
+          dispatch({ type: 'SET_PHASE', phase: 'lifecycle' });
+          orchestrator.reconfigure(providerConfig);
+        }}
+      />
+    );
+  }
+
+  // Fatal error (fallback — normally fatal events transition to provider_setup)
   if (phase === 'error') {
     return (
       <Box flexDirection="column" height={terminalRows} padding={1}>

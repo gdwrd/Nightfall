@@ -25,6 +25,7 @@ export type AppPhase =
   | 'answered' // Question answered
   | 'completed' // Task finished
   | 'error' // Fatal error
+  | 'provider_setup' // Provider setup wizard active
   | 'history_view' // Browsing task history
   | 'rollback_confirm' // Awaiting rollback cascade confirmation
   | 'model_view' // Picking an LLM model
@@ -63,6 +64,7 @@ export interface AppState {
   locks: FileLock[];
   messages: string[];
   errorMessage: string | null;
+  providerSetupError: string | null;
   slashOutput: string | null;
   historyRuns: TaskRun[];
   historySnapshots: SnapshotMeta[];
@@ -83,6 +85,7 @@ const initialState: AppState = {
   locks: [],
   messages: [],
   errorMessage: null,
+  providerSetupError: null,
   slashOutput: null,
   historyRuns: [],
   historySnapshots: [],
@@ -111,7 +114,7 @@ export function reducer(state: AppState, action: AppAction): AppState {
         };
       }
       if (action.event.type === 'fatal') {
-        return { ...base, phase: 'error', errorMessage: action.event.message };
+        return { ...base, phase: 'provider_setup', providerSetupError: action.event.message };
       }
       return base;
     }
@@ -281,6 +284,9 @@ export function reducer(state: AppState, action: AppAction): AppState {
         phase: 'awaiting_approval',
         messages: [...state.messages.slice(-9), `⚠ Editor: ${action.message}`],
       };
+
+    case 'SET_PROVIDER_SETUP':
+      return { ...state, phase: 'provider_setup', providerSetupError: action.errorMessage };
 
     default:
       return state;
