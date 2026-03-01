@@ -29,4 +29,5 @@ export type AppAction =
   | { type: 'SET_SETTINGS_VIEW'; data: SettingsViewData }
   | { type: 'SET_NEW_PROJECT'; data: NewProjectWizardData }
   | { type: 'UPDATE_NEW_PROJECT'; partial: Partial<NewProjectWizardData> }
+  | { type: 'APPEND_NEW_PROJECT_HISTORY'; entry: { role: 'user' | 'assistant'; content: string } }
   | { type: 'CLEAR_NEW_PROJECT' };

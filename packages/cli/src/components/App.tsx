@@ -230,11 +230,11 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
                   status: 'gathering',
                   currentQuestion: data.question as string,
                   questionNumber: data.questionNumber as number,
-                  history: [
-                    ...(state.newProjectData?.history ?? []),
-                    { role: 'assistant' as const, content: data.question as string },
-                  ],
                 },
+              });
+              dispatch({
+                type: 'APPEND_NEW_PROJECT_HISTORY',
+                entry: { role: 'assistant' as const, content: data.question as string },
               });
               return;
 
@@ -294,6 +294,12 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
     if (key.ctrl && input === 'c') {
       if (phase === 'running' || phase === 'planning') {
         abortControllerRef.current?.abort();
+      } else if (phase === 'new_project') {
+        const sid = state.newProjectData?.sessionId;
+        if (sid) {
+          orchestrator.sendSlashCommand('/new-project', `cancel ${sid}`);
+        }
+        dispatch({ type: 'CLEAR_NEW_PROJECT' });
       } else {
         exit();
       }

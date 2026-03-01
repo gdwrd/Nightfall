@@ -563,16 +563,16 @@ export class TaskOrchestrator extends EventEmitter {
 
     const output = await newProjectHandler(ctx, `start ${prompt}`);
 
-    // Mark the task run as completed first, so the CLI processes the
-    // TASK_STATE update before the SLASH_RESULT that enters the wizard.
+    // Emit the wizard payload first so the CLI enters new_project phase.
+    // Do NOT emit task:status with 'completed' — it would flash a misleading
+    // "Task completed successfully" message before the wizard opens.
+    this.emit('slash:result', { command: '/new-project', output });
+
+    // Persist the run as completed for logging, but don't broadcast it.
     run.status = 'completed';
     run.completedAt = Date.now();
     this.activeRuns.set(run.id, run);
-    this.emit('task:status', this.snapshot(run));
     await this.persistLog(run);
-
-    // Emit as a slash:result so the CLI handles it identically to /new-project
-    this.emit('slash:result', { command: '/new-project', output });
 
     return this.snapshot(run);
   }

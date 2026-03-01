@@ -114,7 +114,7 @@ export const NewProjectWizard: React.FC<NewProjectWizardProps> = ({
       {currentQuestion && !isCompiling && status !== 'asking_plan' && (
         <Box flexDirection="column" marginBottom={1}>
           <Text color={THEME.primary} bold>
-            {status === 'asking_idea' ? '' : `Q${questionNumber}: `}
+            {status === 'asking_idea' ? '' : `Q${questionNumber + 1}: `}
             <Text color={THEME.text} bold={false}>
               {currentQuestion}
             </Text>

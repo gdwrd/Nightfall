@@ -217,6 +217,17 @@ function reducer(state: AppState, action: AppAction): AppState {
           : null,
       };
 
+    case 'APPEND_NEW_PROJECT_HISTORY':
+      return {
+        ...state,
+        newProjectData: state.newProjectData
+          ? {
+              ...state.newProjectData,
+              history: [...state.newProjectData.history, action.entry],
+            }
+          : null,
+      };
+
     case 'CLEAR_NEW_PROJECT':
       return { ...state, phase: 'idle', newProjectData: null };
 
