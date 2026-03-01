@@ -292,13 +292,19 @@ export async function newProjectHandler(
       const idea = trimmed === 'start' ? '' : trimmed.slice('start '.length).trim();
       const { session, provider } = handleStart(ctx, idea);
 
-      // Get the first question from the LLM
-      const messages: ChatMessage[] = [
-        { role: 'system', content: SPEC_BUILDER_SYSTEM_PROMPT },
-        { role: 'user', content: `Here's the idea:\n\n${idea}` },
-      ];
-
-      const response = await collectResponse(provider, messages);
+      // Get the first question from the LLM. If this fails, clean up the
+      // session so the user isn't permanently locked out of the wizard.
+      let response: string;
+      try {
+        const messages: ChatMessage[] = [
+          { role: 'system', content: SPEC_BUILDER_SYSTEM_PROMPT },
+          { role: 'user', content: `Here's the idea:\n\n${idea}` },
+        ];
+        response = await collectResponse(provider, messages);
+      } catch (err) {
+        sessionManager.delete(session.id);
+        throw err;
+      }
       session.history.push({ role: 'assistant', content: response });
 
       return JSON.stringify({

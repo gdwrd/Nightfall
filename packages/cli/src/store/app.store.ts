@@ -212,9 +212,17 @@ function reducer(state: AppState, action: AppAction): AppState {
     case 'UPDATE_NEW_PROJECT':
       return {
         ...state,
+        phase: 'new_project',
         newProjectData: state.newProjectData
           ? { ...state.newProjectData, ...action.partial }
-          : null,
+          : {
+              sessionId: '',
+              status: 'gathering',
+              currentQuestion: null,
+              questionNumber: 0,
+              history: [],
+              ...action.partial,
+            },
       };
 
     case 'APPEND_NEW_PROJECT_HISTORY':
