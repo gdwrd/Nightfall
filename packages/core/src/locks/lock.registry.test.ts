@@ -29,9 +29,9 @@ describe('acquireLock', () => {
     expect(locks[0].lockedAt).toBeTypeOf('number');
   });
 
-  it('emits lock_acquired event', async () => {
+  it('emits lock:acquired event', async () => {
     const handler = vi.fn();
-    registry.on('lock_acquired', handler);
+    registry.on('lock:acquired', handler);
 
     await registry.acquireLock('src/index.ts', 'agent-1');
 
@@ -94,9 +94,9 @@ describe('releaseLock', () => {
     expect(registry.getLocks()).toHaveLength(0);
   });
 
-  it('emits lock_released event', async () => {
+  it('emits lock:released event', async () => {
     const handler = vi.fn();
-    registry.on('lock_released', handler);
+    registry.on('lock:released', handler);
 
     await registry.acquireLock('src/index.ts', 'agent-1');
     registry.releaseLock('src/index.ts', 'agent-1');
@@ -157,9 +157,9 @@ describe('releaseAllLocksFor', () => {
     expect(locks[0].lockedBy).toBe('agent-2');
   });
 
-  it('emits lock_released for each freed lock', async () => {
+  it('emits lock:released for each freed lock', async () => {
     const handler = vi.fn();
-    registry.on('lock_released', handler);
+    registry.on('lock:released', handler);
 
     await registry.acquireLock('a.ts', 'agent-1');
     await registry.acquireLock('b.ts', 'agent-1');
@@ -187,9 +187,9 @@ describe('deadlock watcher', () => {
     expect(registry.getLocks()).toHaveLength(0);
   });
 
-  it('emits lock_deadlock event for auto-released locks', async () => {
+  it('emits lock:deadlock event for auto-released locks', async () => {
     const handler = vi.fn();
-    registry.on('lock_deadlock', handler);
+    registry.on('lock:deadlock', handler);
 
     await registry.acquireLock('stale.ts', 'agent-1');
 

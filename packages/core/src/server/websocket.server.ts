@@ -9,6 +9,7 @@ import type {
 import { TaskOrchestrator } from '../orchestrator/task.orchestrator.js';
 import { ensureOllama } from '../ollama/ollama.lifecycle.js';
 import { ensureOpenRouter } from '../providers/openrouter/openrouter.lifecycle.js';
+import { checkAnthropicKey } from '../providers/anthropic/anthropic.lifecycle.js';
 import { WsBroadcaster } from './ws.broadcaster.js';
 import type { PendingApprovalHandle } from './ws.broadcaster.js';
 import { CommandDispatcher } from '../commands/command.dispatcher.js';
@@ -112,6 +113,8 @@ export class NightfallServer extends EventEmitter {
   // ---------------------------------------------------------------------------
 
   private startProviderLifecycle(): void {
+    this.broadcaster.broadcast({ type: 'LIFECYCLE', payload: { type: 'provider_check' } });
+
     const onEvent = (event: ProviderLifecycleEvent) => {
       this.broadcaster.broadcast({ type: 'LIFECYCLE', payload: event });
     };
@@ -119,11 +122,13 @@ export class NightfallServer extends EventEmitter {
     const lifecyclePromise =
       this.config.provider.name === 'openrouter'
         ? ensureOpenRouter(this.config, onEvent)
-        : ensureOllama(this.config, onEvent);
+        : this.config.provider.name === 'anthropic'
+          ? checkAnthropicKey(this.config, onEvent)
+          : ensureOllama(this.config, onEvent);
 
     lifecyclePromise.catch((err: unknown) => {
-      const message = err instanceof Error ? err.message : String(err);
-      this.broadcaster.broadcast({ type: 'LIFECYCLE', payload: { type: 'fatal', message } });
+      const error = err instanceof Error ? err.message : String(err);
+      this.broadcaster.broadcast({ type: 'LIFECYCLE', payload: { type: 'provider_error', error } });
     });
   }
 
@@ -136,7 +141,7 @@ export class NightfallServer extends EventEmitter {
       let msg: ClientMessage;
       try {
         msg = JSON.parse(raw.toString()) as ClientMessage;
-      } catch {
+      } catch (_err) {
         this.broadcaster.send(ws, { type: 'ERROR', payload: { message: 'Invalid JSON message' } });
         return;
       }
@@ -153,13 +158,16 @@ export class NightfallServer extends EventEmitter {
       case 'SUBMIT_TASK': {
         const ac = new AbortController();
         this.activeAbortControllers.push(ac);
-        this.orchestrator.submitTask(msg.payload.prompt, ac.signal).catch((err: unknown) => {
-          const message = err instanceof Error ? err.message : String(err);
-          this.broadcaster.send(ws, { type: 'ERROR', payload: { message } });
-        }).finally(() => {
-          const idx = this.activeAbortControllers.indexOf(ac);
-          if (idx !== -1) this.activeAbortControllers.splice(idx, 1);
-        });
+        this.orchestrator
+          .submitTask(msg.payload.prompt, ac.signal)
+          .catch((err: unknown) => {
+            const message = err instanceof Error ? err.message : String(err);
+            this.broadcaster.send(ws, { type: 'ERROR', payload: { message } });
+          })
+          .finally(() => {
+            const idx = this.activeAbortControllers.indexOf(ac);
+            if (idx !== -1) this.activeAbortControllers.splice(idx, 1);
+          });
         break;
       }
 

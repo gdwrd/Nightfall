@@ -53,11 +53,17 @@ The core runs as a standalone WebSocket server; the CLI is a pure WS client. Thi
 - **`agents/`** — `BaseAgent` class drives the LLM loop (call → parse tool call → execute → repeat until `<done>`). All four agent roles are instances of `BaseAgent` with different configs. Streaming responses are throttled to emit live previews every 200 ms.
 - **`orchestrator/`** — `TaskOrchestrator` coordinates the full lifecycle: Team Lead plans → user approves → Engineers run in parallel waves → Reviewer verifies → rework loop if needed → Memory Manager captures patterns. Emits typed events consumed by the WS server.
 - **`server/`** — `NightfallServer` wraps the orchestrator behind a WebSocket interface. Handles 5 `ClientMessage` types: `SUBMIT_TASK`, `APPROVE_PLAN`, `REJECT_PLAN`, `INTERRUPT`, `SLASH_COMMAND`.
-- **`providers/`** — `ProviderAdapter` interface with Ollama and OpenRouter implementations. `provider.factory.ts` selects the adapter from config.
-- **`tools/`** — `ToolRegistry` enforces per-role tool access. Role permissions: `team-lead` → read/assign/review, `engineer` → read/write_diff/run_command, `reviewer` → read/run_command, `memory-manager` → read/write_memory/update_index.
-- **`commands/handlers/`** — 12 slash command handlers (`/init`, `/help`, `/status`, `/history`, `/memory`, `/config`, `/agents`, `/clear`, `/compact`, `/model`, `/settings`, `/new-project`).
+- **`providers/`** — `ProviderAdapter` interface with Ollama, OpenRouter, and Anthropic implementations. `provider.factory.ts` selects the adapter from config. On startup, `NightfallServer.startProviderLifecycle()` runs a preflight check (Ollama binary, OpenRouter API key, Anthropic API key) and emits `LIFECYCLE` events for the UI.
+- **`tools/`** — `ToolRegistry` enforces per-role tool access. Role permissions: `team-lead` → read/assign/review, `engineer` → read/write_diff/run_command, `reviewer` → read/run_command, `memory-manager` → read/write_memory/update_index. Parameters are validated against each tool's `ToolDefinition.parameters` schema before dispatch.
+- **`commands/handlers/`** — 14 slash command handlers (`/init`, `/help`, `/status`, `/history`, `/memory`, `/config`, `/agents`, `/clear`, `/compact`, `/model`, `/settings`, `/new-project`, `/undo`, `/export`).
 - **`new-project/`** — `NewProjectSessionManager` holds in-memory wizard sessions, `deriveSlug` generates kebab-case file names, and system prompts drive the iterative Q&A, spec compilation, and plan generation LLM interactions.
-- **`locks/`**, **`snapshots/`**, **`memory/`** — file lock registry (deadlock detection), pre-task snapshots with cascade-aware rollback, memory bank R/W.
+- **`locks/`**, **`snapshots/`**, **`memory/`** — file lock registry (deadlock detection), pre-task snapshots with cascade-aware rollback, memory bank R/W. `SnapshotManager` extends `EventEmitter` and emits `snapshot:error` for non-fatal read/rollback failures; the orchestrator accumulates these into `TaskRun.warnings[]`. `MemoryManager(projectRoot, namespace?)` stores files under `.nightfall/memory/<namespace>/` when a namespace is set; use `deriveProjectSlug(projectRoot)` from `memory.init.ts` to derive the namespace.
+
+### Conventions
+
+- Internal EventEmitter events use `namespace:action` naming (colon-separated): `lock:acquired`, `lock:released`, `lock:deadlock`, `snapshot:error`, `history:cleared`, `task:status`, etc.
+- Inter-agent calls (`assign_task`, `request_review`) are audit-logged via module-level logger injection: `setAssignTaskLogger`/`setRequestReviewLogger` are called by the orchestrator before each task. Messages are buffered in `TaskLogger.agentMsgBuffer` and written into `TaskRun.agent_messages[]` on save.
+- Token estimation: `estimateTokens(text)` in `agent.utils.ts` uses word-count × 1.3 with a char/4 fallback for single-token strings. Known model context windows are in `MODEL_CONTEXT_WINDOWS` (same file).
 
 ### CLI internals (`packages/cli/src/`)
 
@@ -99,7 +105,12 @@ Flat config in `eslint.config.mjs` at root. Covers `**/*.{ts,tsx}`. Key rules:
 ```
 .nightfall/
   config.yaml      # user config (model, provider, port, agent overrides)
-  memory/          # memory bank files managed by memory-manager agent
+  memory/
+    <project-slug>/  # namespaced per project (slug = dir-name + git-hash prefix)
+      index.md
+      progress.md
+      components/
+      .compact-backup/  # created by /compact before overwriting
   snapshots/       # pre-task file snapshots for rollback
   logs/            # task run logs (JSON)
 ```

@@ -33,7 +33,7 @@ export class LockRegistry extends EventEmitter {
       if (!existing || existing.lockedBy === agentId) {
         const lock: FileLock = { path, lockedBy: agentId, lockedAt: Date.now() };
         this.locks.set(path, lock);
-        this.emit('lock_acquired', lock);
+        this.emit('lock:acquired', lock);
         return;
       }
 
@@ -61,7 +61,7 @@ export class LockRegistry extends EventEmitter {
     }
 
     this.locks.delete(path);
-    this.emit('lock_released', { path, lockedBy: agentId });
+    this.emit('lock:released', { path, lockedBy: agentId });
   }
 
   /**
@@ -78,7 +78,7 @@ export class LockRegistry extends EventEmitter {
     for (const [path, lock] of this.locks) {
       if (lock.lockedBy === agentId) {
         this.locks.delete(path);
-        this.emit('lock_released', { path, lockedBy: agentId });
+        this.emit('lock:released', { path, lockedBy: agentId });
       }
     }
   }
@@ -96,7 +96,7 @@ export class LockRegistry extends EventEmitter {
 
   /**
    * Periodically check for locks held longer than deadlockTimeoutMs.
-   * Auto-releases them and emits 'lock_deadlock'.
+   * Auto-releases them and emits 'lock:deadlock'.
    */
   private startDeadlockWatcher(): void {
     this.watcherTimer = setInterval(() => {
@@ -105,7 +105,7 @@ export class LockRegistry extends EventEmitter {
       for (const [path, lock] of this.locks) {
         if (now - lock.lockedAt > this.deadlockTimeoutMs) {
           this.locks.delete(path);
-          this.emit('lock_deadlock', { path, lockedBy: lock.lockedBy });
+          this.emit('lock:deadlock', { path, lockedBy: lock.lockedBy });
         }
       }
     }, this.watcherIntervalMs);

@@ -1,7 +1,8 @@
 import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { applyPatch } from 'diff';
 import type { LockRegistry } from '../../locks/lock.registry.js';
-import type { ToolImpl, ToolResult, ToolContext } from '../tool.types.js';
+import type { ToolImpl, ToolResult, ToolContext, ParameterSchema } from '../tool.types.js';
 import { resolveAndValidatePath } from './path.utils.js';
 
 let _lockRegistry: LockRegistry | null = null;
@@ -74,7 +75,7 @@ export const writeDiffTool: ToolImpl = {
       let original: string;
       try {
         original = await fs.readFile(resolved, 'utf-8');
-      } catch {
+      } catch (_err) {
         // File might not exist yet; start from empty
         original = '';
       }
@@ -85,6 +86,7 @@ export const writeDiffTool: ToolImpl = {
         throw new Error('Patch did not apply cleanly — the diff may be stale or malformed');
       }
 
+      await fs.mkdir(path.dirname(resolved), { recursive: true });
       await fs.writeFile(resolved, patched, 'utf-8');
 
       return {
@@ -103,10 +105,14 @@ export const writeDiffTool: ToolImpl = {
       if (registry) {
         try {
           registry.releaseLock(resolved, ctx.agentId);
-        } catch {
+        } catch (_err) {
           // Ignore release errors — lock may have already been auto-released by deadlock watcher
         }
       }
     }
   },
 };
+
+export const parameterSchema: ParameterSchema[] = Object.entries(
+  writeDiffTool.definition.parameters,
+).map(([name, def]) => ({ name, ...def }));

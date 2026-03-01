@@ -1,3 +1,4 @@
+import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import type { SnapshotMeta } from '@nightfall/shared';
@@ -8,8 +9,22 @@ function zeroPad(num: number, width: number): string {
   return String(num).padStart(width, '0');
 }
 
-export class SnapshotManager {
-  constructor(private projectRoot: string) {}
+export interface SnapshotErrorPayload {
+  error: string;
+  context: string;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface SnapshotManager {
+  on(event: 'snapshot:error', listener: (payload: SnapshotErrorPayload) => void): this;
+  emit(event: 'snapshot:error', payload: SnapshotErrorPayload): boolean;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class SnapshotManager extends EventEmitter {
+  constructor(private projectRoot: string) {
+    super();
+  }
 
   private snapshotsDir(): string {
     return path.join(this.projectRoot, SNAPSHOTS_DIR);
@@ -64,8 +79,15 @@ export class SnapshotManager {
 
       try {
         await fs.copyFile(absoluteSrc, dest);
-      } catch {
-        // If the file doesn't exist yet (new file), skip copying
+      } catch (err) {
+        // ENOENT means the file doesn't exist yet (new file to be created by the task) — skip.
+        // Any other error (permissions, disk full, etc.) should be surfaced.
+        if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+          this.emit('snapshot:error', {
+            error: err instanceof Error ? err.message : String(err),
+            context: `createSnapshot:${snapshotId}:${relativePath}`,
+          });
+        }
       }
     }
 
@@ -103,7 +125,7 @@ export class SnapshotManager {
     let entries: string[];
     try {
       entries = await fs.readdir(dir);
-    } catch {
+    } catch (_err) {
       return [];
     }
 
@@ -114,8 +136,11 @@ export class SnapshotManager {
       try {
         const content = await fs.readFile(metaFile, 'utf-8');
         snapshots.push(JSON.parse(content) as SnapshotMeta);
-      } catch {
-        // Skip directories without valid meta.json
+      } catch (err) {
+        this.emit('snapshot:error', {
+          error: err instanceof Error ? err.message : String(err),
+          context: `read_meta:${entry}`,
+        });
       }
     }
 
@@ -147,8 +172,24 @@ export class SnapshotManager {
           if (!restoredFiles.includes(relativePath)) {
             restoredFiles.push(relativePath);
           }
-        } catch {
-          // File may not exist in snapshot (was a new file)
+        } catch (err) {
+          if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+            // The source snapshot copy doesn't exist — this file was newly created during the
+            // task. Delete it from the live project to fully undo the task.
+            try {
+              await fs.unlink(dest);
+            } catch (_unlinkErr) {
+              this.emit('snapshot:error', {
+                error: `Could not remove new file during rollback: ${relativePath}`,
+                context: `rollback:${snap.snapshotId}`,
+              });
+            }
+          } else {
+            this.emit('snapshot:error', {
+              error: err instanceof Error ? err.message : String(err),
+              context: `rollback:${snap.snapshotId}:${relativePath}`,
+            });
+          }
         }
       }
 
@@ -168,8 +209,8 @@ export class SnapshotManager {
     const target = await this.getSnapshot(snapshotId);
     const all = await this.listSnapshots();
 
-    // Include target and all snapshots with timestamp >= target.timestamp
-    const chain = all.filter((s) => s.timestamp >= target.timestamp);
+    // Include target (by exact ID) and all snapshots newer than target
+    const chain = all.filter((s) => s.snapshotId === snapshotId || s.timestamp > target.timestamp);
 
     // Already sorted newest-first from listSnapshots
     return chain;

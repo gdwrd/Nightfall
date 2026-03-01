@@ -69,10 +69,7 @@ export const NewProjectWizard: React.FC<NewProjectWizardProps> = ({
     }
   }
 
-  const headerLabel =
-    status === 'asking_idea'
-      ? 'NEW PROJECT'
-      : `Question ${questionNumber + 1}`;
+  const headerLabel = status === 'asking_idea' ? 'NEW PROJECT' : `Question ${questionNumber + 1}`;
 
   return (
     <Box
@@ -141,12 +138,16 @@ export const NewProjectWizard: React.FC<NewProjectWizardProps> = ({
             ✓ Specification saved!
           </Text>
           <Box marginTop={1}>
-            <Text color={THEME.warning}>
-              Would you like to generate a development plan?{' '}
-            </Text>
+            <Text color={THEME.warning}>Would you like to generate a development plan? </Text>
             <Text color={THEME.textDim}>
-              <Text bold color={THEME.success}>Y</Text>es ·{' '}
-              <Text bold color={THEME.error}>N</Text>o
+              <Text bold color={THEME.success}>
+                Y
+              </Text>
+              es ·{' '}
+              <Text bold color={THEME.error}>
+                N
+              </Text>
+              o
             </Text>
           </Box>
         </Box>

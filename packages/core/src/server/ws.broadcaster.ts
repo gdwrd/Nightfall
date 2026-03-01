@@ -75,9 +75,17 @@ export class WsBroadcaster {
             : run.status === 'rework_limit_reached'
               ? 'Rework limit reached. Review changes manually.'
               : run.status === 'answered'
-                ? run.answer ?? 'Question answered.'
+                ? (run.answer ?? 'Question answered.')
                 : 'Task cancelled.';
-        this.broadcast({ type: 'TASK_COMPLETE', payload: { status: run.status, summary } });
+        this.broadcast({
+          type: 'TASK_COMPLETE',
+          payload: {
+            status: run.status,
+            summary,
+            ...(run.warnings && run.warnings.length > 0 ? { warnings: run.warnings } : {}),
+            ...(run.tokenUsage ? { tokenUsage: run.tokenUsage } : {}),
+          },
+        });
       }
     });
 
@@ -91,6 +99,14 @@ export class WsBroadcaster {
 
     orchestrator.on('slash:result', (payload: { command: string; output: string }) => {
       this.broadcast({ type: 'SLASH_RESULT', payload });
+    });
+
+    orchestrator.on('history:cleared', () => {
+      // Broadcast to all clients so every connected UI clears its history view.
+      // Use empty output so App.tsx's `if (payload.output)` guard suppresses a
+      // duplicate success message on the client that sent /clear (which already
+      // received the real output via the unicast SLASH_RESULT in websocket.server.ts).
+      this.broadcast({ type: 'SLASH_RESULT', payload: { command: '/clear', output: '' } });
     });
 
     return {

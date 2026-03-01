@@ -24,7 +24,13 @@ await build({
   format: 'esm',
   target: 'node18',
   outfile: path.resolve(__dirname, 'dist/index.js'),
-  banner: { js: '#!/usr/bin/env node' },
+  banner: {
+    js: [
+      '#!/usr/bin/env node',
+      "import { createRequire } from 'module';",
+      'const require = createRequire(import.meta.url);',
+    ].join('\n'),
+  },
   external: [
     'ink',
     'ink-text-input',

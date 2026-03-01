@@ -121,7 +121,7 @@ export class OpenRouterAdapter implements ProviderAdapter {
       });
       clearTimeout(timeout);
       return response.ok;
-    } catch {
+    } catch (_err) {
       return false;
     }
   }

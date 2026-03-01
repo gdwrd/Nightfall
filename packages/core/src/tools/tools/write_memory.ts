@@ -1,5 +1,6 @@
 import { MemoryManager } from '../../memory/memory.manager.js';
-import type { ToolImpl, ToolResult, ToolContext } from '../tool.types.js';
+import { deriveProjectSlug } from '../../memory/memory.init.js';
+import type { ToolImpl, ToolResult, ToolContext, ParameterSchema } from '../tool.types.js';
 
 export const writeMemoryTool: ToolImpl = {
   definition: {
@@ -32,7 +33,8 @@ export const writeMemoryTool: ToolImpl = {
       };
     }
 
-    const manager = new MemoryManager(ctx.projectRoot);
+    const namespace = ctx.memoryNamespace ?? (await deriveProjectSlug(ctx.projectRoot));
+    const manager = new MemoryManager(ctx.projectRoot, namespace);
 
     try {
       await manager.updateFile(file, content);
@@ -47,3 +49,7 @@ export const writeMemoryTool: ToolImpl = {
     }
   },
 };
+
+export const parameterSchema: ParameterSchema[] = Object.entries(
+  writeMemoryTool.definition.parameters,
+).map(([name, def]) => ({ name, ...def }));

@@ -4,7 +4,14 @@ import path from 'node:path';
 const MEMORY_DIR = '.nightfall/memory';
 
 function resolveMemoryPath(projectRoot: string, relativePath: string): string {
-  return path.join(projectRoot, MEMORY_DIR, relativePath);
+  const memoryRoot = path.resolve(projectRoot, MEMORY_DIR);
+  const resolved = path.resolve(memoryRoot, relativePath);
+  if (resolved !== memoryRoot && !resolved.startsWith(memoryRoot + path.sep)) {
+    throw new Error(
+      `Memory path "${relativePath}" resolves outside the memory directory and cannot be accessed`,
+    );
+  }
+  return resolved;
 }
 
 /**
@@ -30,8 +37,9 @@ export async function readMemoryFile(
   const filePath = resolveMemoryPath(projectRoot, relativePath);
   try {
     return await fs.readFile(filePath, 'utf8');
-  } catch {
-    return null;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw err;
   }
 }
 

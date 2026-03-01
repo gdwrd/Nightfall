@@ -106,7 +106,7 @@ function collectUntil(
           clearTimeout(timer);
           done();
         }
-      } catch {
+      } catch (_err) {
         /* ignore */
       }
     });
@@ -234,8 +234,7 @@ describe('NightfallServer', () => {
 
     const approvalMsg = msgs.find(
       (m) =>
-        m.type === 'TASK_STATE' &&
-        (m.payload as { status: string }).status === 'awaiting_approval',
+        m.type === 'TASK_STATE' && (m.payload as { status: string }).status === 'awaiting_approval',
     );
     expect(approvalMsg).toBeDefined();
     expect((approvalMsg!.payload as { plan: unknown }).plan).toBeDefined();

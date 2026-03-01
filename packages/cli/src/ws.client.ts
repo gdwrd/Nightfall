@@ -23,10 +23,7 @@ export interface IOrchestrator extends EventEmitter {
   on(event: 'agent:state', listener: (state: AgentState) => void): this;
   on(event: 'lock:update', listener: (locks: FileLock[]) => void): this;
   on(event: 'lifecycle', listener: (event: ProviderLifecycleEvent) => void): this;
-  on(
-    event: 'slash:result',
-    listener: (payload: { command: string; output: string }) => void,
-  ): this;
+  on(event: 'slash:result', listener: (payload: { command: string; output: string }) => void): this;
   on(event: 'ws:error', listener: (err: Error) => void): this;
   on(event: string, listener: (...args: unknown[]) => void): this;
 
@@ -132,10 +129,7 @@ export class NightfallWsClient extends EventEmitter implements IOrchestrator {
   private scheduleReconnect(): void {
     if (this._isReconnecting) return; // Prevent concurrent reconnect loops
     if (this._reconnectAttempt >= this.MAX_RECONNECT_ATTEMPTS) {
-      this.emit(
-        'ws:error',
-        new Error('WebSocket disconnected; max reconnect attempts reached'),
-      );
+      this.emit('ws:error', new Error('WebSocket disconnected; max reconnect attempts reached'));
       return;
     }
     this._isReconnecting = true;
@@ -146,7 +140,7 @@ export class NightfallWsClient extends EventEmitter implements IOrchestrator {
       'ws:error',
       new Error(
         `WebSocket disconnected. Reconnecting in ${delayMs / 1000}s ` +
-        `(attempt ${this._reconnectAttempt}/${this.MAX_RECONNECT_ATTEMPTS})...`,
+          `(attempt ${this._reconnectAttempt}/${this.MAX_RECONNECT_ATTEMPTS})...`,
       ),
     );
     setTimeout(() => {

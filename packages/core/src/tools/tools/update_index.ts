@@ -1,6 +1,7 @@
 import type { MemoryIndex, MemoryIndexEntry, MemoryComponentEntry } from '@nightfall/shared';
 import { MemoryManager } from '../../memory/memory.manager.js';
-import type { ToolImpl, ToolResult, ToolContext } from '../tool.types.js';
+import { deriveProjectSlug } from '../../memory/memory.init.js';
+import type { ToolImpl, ToolResult, ToolContext, ParameterSchema } from '../tool.types.js';
 
 export const updateIndexTool: ToolImpl = {
   definition: {
@@ -40,7 +41,8 @@ export const updateIndexTool: ToolImpl = {
       };
     }
 
-    const manager = new MemoryManager(ctx.projectRoot);
+    const namespace = ctx.memoryNamespace ?? (await deriveProjectSlug(ctx.projectRoot));
+    const manager = new MemoryManager(ctx.projectRoot, namespace);
 
     try {
       const index: MemoryIndex = await manager.loadIndex();
@@ -80,3 +82,7 @@ export const updateIndexTool: ToolImpl = {
     }
   },
 };
+
+export const parameterSchema: ParameterSchema[] = Object.entries(
+  updateIndexTool.definition.parameters,
+).map(([name, def]) => ({ name, ...def }));

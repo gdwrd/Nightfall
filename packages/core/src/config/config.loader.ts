@@ -4,6 +4,7 @@ import os from 'node:os';
 import yaml from 'js-yaml';
 import type { NightfallConfig } from '@nightfall/shared';
 import { DEFAULT_CONFIG } from './config.defaults.js';
+import { deriveProjectSlug } from '../memory/memory.init.js';
 
 const NIGHTFALL_DIR = path.join(os.homedir(), '.nightfall');
 const CONFIG_PATH = path.join(NIGHTFALL_DIR, 'config.yaml');
@@ -58,6 +59,9 @@ function validateConfig(config: NightfallConfig): void {
     case 'openrouter':
       // No host/port needed. API key is validated at runtime via env var.
       break;
+    case 'anthropic':
+      // No host/port needed. API key is validated at runtime via env var.
+      break;
     default:
       throw new Error(
         `Config validation failed: unknown provider "${String((provider as unknown as { name: string }).name)}"`,
@@ -78,6 +82,25 @@ function validateConfig(config: NightfallConfig): void {
   }
   if (typeof logs.retention !== 'number' || logs.retention < 1) {
     throw new Error('Config validation failed: logs.retention must be >= 1');
+  }
+
+  const agentsCfg = config.agents;
+  if (agentsCfg !== undefined) {
+    const roles = ['team-lead', 'engineer', 'reviewer', 'memory-manager'] as const;
+    for (const role of roles) {
+      const override = agentsCfg[role];
+      if (override?.max_iterations !== undefined) {
+        if (
+          typeof override.max_iterations !== 'number' ||
+          !Number.isInteger(override.max_iterations) ||
+          override.max_iterations < 1
+        ) {
+          throw new Error(
+            `Config validation failed: agents.${role}.max_iterations must be a positive integer`,
+          );
+        }
+      }
+    }
   }
 }
 
@@ -119,3 +142,11 @@ export async function loadConfig(): Promise<NightfallConfig> {
 }
 
 export { NIGHTFALL_DIR, CONFIG_PATH };
+
+/**
+ * Derive the memory namespace for the given project root directory.
+ * Delegates to deriveProjectSlug from memory.init.
+ */
+export async function deriveMemoryNamespace(projectRoot: string): Promise<string> {
+  return deriveProjectSlug(projectRoot);
+}

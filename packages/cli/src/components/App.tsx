@@ -1,6 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Box, Text, useApp, useInput, useStdout } from 'ink';
-import type { NightfallConfig, TaskRun, AgentState, FileLock, SnapshotMeta } from '@nightfall/shared';
+import type {
+  NightfallConfig,
+  TaskRun,
+  AgentState,
+  FileLock,
+  SnapshotMeta,
+} from '@nightfall/shared';
 import type { ProviderLifecycleEvent } from '@nightfall/shared';
 import type { IOrchestrator } from '../ws.client.js';
 import { THEME } from '../theme.js';
@@ -59,6 +65,7 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
     contextLength,
     modelViewData,
     settingsViewData,
+    lastTaskTokens,
   } = state;
   const [inputValue, setInputValue] = useState('');
   const [awaitingInitConfirm, setAwaitingInitConfirm] = useState(false);
@@ -130,6 +137,15 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
       // Detect successful /init so the InfoBar updates without restart
       if (payload.command === '/init' && payload.output.startsWith('✓ Memory bank initialized')) {
         setMemoryBankReady(true);
+      }
+
+      if (payload.command === '/clear') {
+        setAwaitingInitConfirm(false);
+        dispatch({ type: 'HISTORY_CLEARED' });
+        if (payload.output) {
+          dispatch({ type: 'ADD_MESSAGE', message: `✓ ${payload.output}` });
+        }
+        return;
       }
 
       if (payload.command === '/history') {
@@ -215,7 +231,8 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
                 data: {
                   sessionId: '', // No session yet — will be set when start responds
                   status: 'asking_idea',
-                  currentQuestion: 'What would you like to build? Describe your idea in a few sentences.',
+                  currentQuestion:
+                    'What would you like to build? Describe your idea in a few sentences.',
                   questionNumber: 0,
                   history: [],
                 },
@@ -234,7 +251,10 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
                     currentQuestion: data.question as string,
                     questionNumber: data.questionNumber as number,
                     history: [
-                      { role: 'assistant' as const, content: 'What would you like to build? Describe your idea.' },
+                      {
+                        role: 'assistant' as const,
+                        content: 'What would you like to build? Describe your idea.',
+                      },
                       { role: 'user' as const, content: data.idea as string },
                     ],
                   },
@@ -265,7 +285,10 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
                 type: 'UPDATE_NEW_PROJECT',
                 partial: { status: 'compiling_spec', currentQuestion: null },
               });
-              orchestrator.sendSlashCommand('/new-project', `generate-spec ${data.sessionId as string}`);
+              orchestrator.sendSlashCommand(
+                '/new-project',
+                `generate-spec ${data.sessionId as string}`,
+              );
               return;
 
             case 'new_project_spec_saved':
@@ -383,10 +406,7 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
         dispatch({
           type: 'UPDATE_NEW_PROJECT',
           partial: {
-            history: [
-              ...state.newProjectData.history,
-              { role: 'user' as const, content: input },
-            ],
+            history: [...state.newProjectData.history, { role: 'user' as const, content: input }],
           },
         });
         orchestrator.sendSlashCommand('/new-project', `answer ${sessionId} ${input}`);
@@ -417,14 +437,6 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
       // Handle exit locally — no server round-trip needed
       if (lower === '/exit' || lower === '/quit') {
         exit();
-        return;
-      }
-
-      // Handle clear locally — resets CLI state only
-      if (lower === '/clear') {
-        setAwaitingInitConfirm(false);
-        dispatch({ type: 'CLEAR_MESSAGES' });
-        dispatch({ type: 'SET_SLASH_OUTPUT', output: null });
         return;
       }
 
@@ -474,16 +486,25 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
         dispatch({ type: 'SET_PHASE', phase: 'editing_plan' });
         // Defer so ink can release the terminal before spawning the editor
         setTimeout(() => {
-          process.stdin.setRawMode?.(false);
-          const edited = editPlanInEditor(activeRun.plan!);
-          process.stdin.setRawMode?.(true);
-          if (edited) {
-            dispatch({ type: 'UPDATE_PLAN', plan: edited });
-            addMessage('Plan updated from editor.');
-          } else {
-            addMessage('No changes made.');
-          }
-          dispatch({ type: 'SET_PHASE', phase: 'awaiting_approval' });
+          void (async () => {
+            process.stdin.setRawMode?.(false);
+            const result = await editPlanInEditor(activeRun.plan!);
+            process.stdin.setRawMode?.(true);
+            switch (result.kind) {
+              case 'changed':
+                dispatch({ type: 'UPDATE_PLAN', plan: result.plan });
+                addMessage('Plan updated from editor.');
+                dispatch({ type: 'SET_PHASE', phase: 'awaiting_approval' });
+                break;
+              case 'unchanged':
+                addMessage('No changes made.');
+                dispatch({ type: 'SET_PHASE', phase: 'awaiting_approval' });
+                break;
+              case 'failed':
+                dispatch({ type: 'PLAN_EDIT_FAILED', message: result.message });
+                break;
+            }
+          })();
         }, 50);
         return;
       }
@@ -491,7 +512,12 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
     }
 
     // Submit new task
-    if (phase === 'idle' || phase === 'completed' || phase === 'answered' || phase === 'awaiting_approval') {
+    if (
+      phase === 'idle' ||
+      phase === 'completed' ||
+      phase === 'answered' ||
+      phase === 'awaiting_approval'
+    ) {
       dispatch({ type: 'RESET_TASK' });
       const ac = new AbortController();
       abortControllerRef.current = ac;
@@ -512,7 +538,10 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
       ? 'new_project_plan'
       : phase === 'new_project'
         ? 'new_project'
-        : phase === 'running' || phase === 'planning' || phase === 'editing_plan' || phase === 'classifying'
+        : phase === 'running' ||
+            phase === 'planning' ||
+            phase === 'editing_plan' ||
+            phase === 'classifying'
           ? 'running'
           : phase === 'awaiting_approval'
             ? 'plan_approval'
@@ -661,7 +690,9 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
           (phase === 'running' || phase === 'planning' || phase === 'completed') && (
             <>
               <AgentGrid agentStates={agentStates} engineerCount={engineerCount} />
-              {locks.length > 0 && <StatusBar locks={locks} />}
+              {(locks.length > 0 || lastTaskTokens) && (
+                <StatusBar locks={locks} lastTaskTokens={lastTaskTokens} />
+              )}
             </>
           )}
 

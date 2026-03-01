@@ -26,17 +26,17 @@ interface ErrorPayload {
   message: string;
 }
 
-export async function modelHandler(
-  ctx: CommandDispatcherContext,
-  args: string,
-): Promise<string> {
+export async function modelHandler(ctx: CommandDispatcherContext, args: string): Promise<string> {
   const trimmed = args.trim();
 
   // Sub-command: select <modelId>
   if (trimmed.startsWith('select ')) {
     const modelId = trimmed.slice('select '.length).trim();
     if (!modelId) {
-      return JSON.stringify({ type: 'error', message: 'No model specified.' } satisfies ErrorPayload);
+      return JSON.stringify({
+        type: 'error',
+        message: 'No model specified.',
+      } satisfies ErrorPayload);
     }
 
     const updated = {

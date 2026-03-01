@@ -1,5 +1,6 @@
 import { MemoryManager } from '../../memory/memory.manager.js';
-import type { ToolImpl, ToolResult, ToolContext } from '../tool.types.js';
+import { deriveProjectSlug } from '../../memory/memory.init.js';
+import type { ToolImpl, ToolResult, ToolContext, ParameterSchema } from '../tool.types.js';
 
 export const readMemoryTool: ToolImpl = {
   definition: {
@@ -28,7 +29,8 @@ export const readMemoryTool: ToolImpl = {
     }
 
     const resolved = file === 'index' ? 'index.md' : file;
-    const manager = new MemoryManager(ctx.projectRoot);
+    const namespace = ctx.memoryNamespace ?? (await deriveProjectSlug(ctx.projectRoot));
+    const manager = new MemoryManager(ctx.projectRoot, namespace);
 
     try {
       const content = await manager.loadFile(resolved);
@@ -51,3 +53,7 @@ export const readMemoryTool: ToolImpl = {
     }
   },
 };
+
+export const parameterSchema: ParameterSchema[] = Object.entries(
+  readMemoryTool.definition.parameters,
+).map(([name, def]) => ({ name, ...def }));

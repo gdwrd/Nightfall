@@ -21,7 +21,7 @@ export function parseToolCall(response: string): ToolCall | null {
           ? (parsed.parameters as Record<string, unknown>)
           : {},
     };
-  } catch {
+  } catch (_err) {
     return null;
   }
 }
@@ -55,7 +55,7 @@ export function parseDone(response: string): DoneSignal | null {
     // Structured role-specific format — pass raw JSON through unchanged so
     // parsePlan / parseReviewResult / etc. can consume it without double-encoding.
     return { summary: raw };
-  } catch {
+  } catch (_err) {
     // Plain text or malformed JSON — use raw content as summary.
     return { summary: raw };
   }

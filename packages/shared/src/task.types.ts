@@ -1,4 +1,12 @@
-import type { AgentState } from './agent.types.js';
+import type { AgentRole, AgentState } from './agent.types.js';
+
+export interface AgentMessage {
+  timestamp: string;
+  from: AgentRole;
+  to: AgentRole;
+  type: 'assign' | 'review';
+  payload: unknown;
+}
 
 export type TaskStatus =
   | 'classifying'
@@ -45,4 +53,8 @@ export interface TaskRun {
   answer: string | null;
   /** Aggregated token usage across all agents for this task run. */
   tokenUsage?: { promptTokens: number; completionTokens: number; totalTokens: number };
+  /** Non-fatal warnings accumulated during the task (e.g. snapshot errors). */
+  warnings?: string[];
+  /** Audit log of inter-agent messages (assign_task and request_review calls). */
+  agent_messages?: AgentMessage[];
 }

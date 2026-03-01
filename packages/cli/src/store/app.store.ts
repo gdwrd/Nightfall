@@ -1,5 +1,13 @@
 import { useReducer } from 'react';
-import type { TaskRun, AgentState, FileLock, ProviderLifecycleEvent, SnapshotMeta, NightfallConfig } from '@nightfall/shared';
+import type {
+  TaskRun,
+  AgentState,
+  FileLock,
+  ProviderLifecycleEvent,
+  SnapshotMeta,
+  NightfallConfig,
+  TokenUsage,
+} from '@nightfall/shared';
 import type { AppAction } from './app.actions.js';
 
 // ---------------------------------------------------------------------------
@@ -64,6 +72,7 @@ export interface AppState {
   modelViewData: ModelViewData | null;
   settingsViewData: SettingsViewData | null;
   newProjectData: NewProjectWizardData | null;
+  lastTaskTokens: TokenUsage | null;
 }
 
 const initialState: AppState = {
@@ -83,13 +92,14 @@ const initialState: AppState = {
   modelViewData: null,
   settingsViewData: null,
   newProjectData: null,
+  lastTaskTokens: null,
 };
 
 // ---------------------------------------------------------------------------
 // Reducer
 // ---------------------------------------------------------------------------
 
-function reducer(state: AppState, action: AppAction): AppState {
+export function reducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
     case 'LIFECYCLE_EVENT': {
       const base = { ...state, lifecycleEvent: action.event };
@@ -113,6 +123,7 @@ function reducer(state: AppState, action: AppAction): AppState {
       const run = action.run;
       const messages = [...state.messages];
       let phase: AppPhase = state.phase;
+      let lastTaskTokens = state.lastTaskTokens;
 
       switch (run.status) {
         case 'classifying':
@@ -137,10 +148,17 @@ function reducer(state: AppState, action: AppAction): AppState {
         case 'completed':
           phase = 'completed';
           messages.push('✓ Task completed successfully.');
+          if (run.warnings && run.warnings.length > 0) {
+            for (const warning of run.warnings) {
+              messages.push(`⚠ ${warning}`);
+            }
+          }
+          lastTaskTokens = run.tokenUsage ?? null;
           break;
         case 'rework_limit_reached':
           phase = 'completed';
           messages.push('⚠ Rework limit reached. Review the changes manually.');
+          lastTaskTokens = run.tokenUsage ?? null;
           break;
         case 'cancelled':
           phase = 'idle';
@@ -154,6 +172,7 @@ function reducer(state: AppState, action: AppAction): AppState {
         activeRun: run,
         agentStates: { ...run.agentStates },
         messages: messages.slice(-10),
+        lastTaskTokens,
       };
     }
 
@@ -179,7 +198,14 @@ function reducer(state: AppState, action: AppAction): AppState {
       return { ...state, phase: action.phase };
 
     case 'RESET_TASK':
-      return { ...state, activeRun: null, agentStates: {}, locks: [], slashOutput: null };
+      return {
+        ...state,
+        activeRun: null,
+        agentStates: {},
+        locks: [],
+        slashOutput: null,
+        lastTaskTokens: null,
+      };
 
     case 'UPDATE_PLAN':
       return {
@@ -235,6 +261,26 @@ function reducer(state: AppState, action: AppAction): AppState {
 
     case 'CLEAR_NEW_PROJECT':
       return { ...state, phase: 'idle', newProjectData: null };
+
+    case 'HISTORY_CLEARED':
+      return {
+        ...state,
+        phase: state.phase === 'lifecycle' || state.phase === 'error' ? state.phase : 'idle',
+        activeRun: null,
+        agentStates: {},
+        historyRuns: [],
+        historySnapshots: [],
+        messages: [],
+        slashOutput: null,
+        lastTaskTokens: null,
+      };
+
+    case 'PLAN_EDIT_FAILED':
+      return {
+        ...state,
+        phase: 'awaiting_approval',
+        messages: [...state.messages.slice(-9), `⚠ Editor: ${action.message}`],
+      };
 
     default:
       return state;

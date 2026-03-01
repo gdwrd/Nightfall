@@ -12,6 +12,8 @@ import { clearHandler } from './handlers/clear.handler.js';
 import { modelHandler } from './handlers/model.handler.js';
 import { settingsHandler } from './handlers/settings.handler.js';
 import { newProjectHandler } from './handlers/new-project.handler.js';
+import { undoHandler } from './handlers/undo.handler.js';
+import { exportHandler } from './handlers/export.handler.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -59,10 +61,10 @@ export class CommandDispatcher {
         return memoryHandler();
 
       case '/compact':
-        return compactHandler();
+        return compactHandler(this.ctx);
 
       case '/clear':
-        return clearHandler();
+        return clearHandler(this.ctx);
 
       case '/model':
         return modelHandler(this.ctx, args);
@@ -72,6 +74,12 @@ export class CommandDispatcher {
 
       case '/new-project':
         return newProjectHandler(this.ctx, args);
+
+      case '/undo':
+        return undoHandler(this.ctx, args);
+
+      case '/export':
+        return exportHandler(this.ctx, args);
 
       default:
         return `Unknown command: ${command}. Type /help for available commands.`;

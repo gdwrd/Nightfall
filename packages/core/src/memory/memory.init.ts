@@ -1,8 +1,12 @@
 import fs from 'node:fs/promises';
 import type { Dirent } from 'node:fs';
 import path from 'node:path';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 import type { MemoryIndex, MemoryIndexEntry, MemoryComponentEntry } from '@nightfall/shared';
 import { MemoryManager } from './memory.manager.js';
+
+const execAsync = promisify(exec);
 
 const SKIP_DIRS = new Set([
   'node_modules',
@@ -15,6 +19,34 @@ const SKIP_DIRS = new Set([
   'coverage',
   '.turbo',
 ]);
+
+/**
+ * Derive a stable, kebab-case project slug from the directory basename.
+ * Appends the first 6 characters of the HEAD commit hash when running inside
+ * a git repository, making the slug unique across clones of the same project.
+ *
+ * Examples:
+ *   /home/user/my-app  (git)  → "my-app-a1b2c3"
+ *   /home/user/my-app  (no git) → "my-app"
+ */
+export async function deriveProjectSlug(projectRoot: string): Promise<string> {
+  const rawName = path.basename(projectRoot);
+  const slug =
+    rawName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'project';
+  try {
+    const { stdout } = await execAsync('git rev-parse HEAD', {
+      cwd: projectRoot,
+      timeout: 3000,
+    });
+    const hash = stdout.trim().slice(0, 6);
+    return `${slug}-${hash}`;
+  } catch (_err) {
+    return slug;
+  }
+}
 
 interface InitResult {
   filesCreated: string[];
@@ -69,7 +101,8 @@ export async function previewMemoryBank(projectRoot: string): Promise<InitPrevie
  * and generating the initial set of memory files.
  */
 export async function initializeMemoryBank(projectRoot: string): Promise<InitResult> {
-  const manager = new MemoryManager(projectRoot);
+  const namespace = await deriveProjectSlug(projectRoot);
+  const manager = new MemoryManager(projectRoot, namespace);
   await manager.ensureStructure();
 
   const projectInfo = await scanProject(projectRoot);
@@ -143,7 +176,7 @@ async function scanProject(projectRoot: string): Promise<ProjectInfo> {
     info.devDependencies = (pkg.devDependencies as Record<string, string>) || {};
     info.scripts = (pkg.scripts as Record<string, string>) || {};
     if (pkg.main) info.entryPoints.push(pkg.main as string);
-  } catch {
+  } catch (_err) {
     info.name = path.basename(projectRoot);
   }
 
@@ -151,7 +184,7 @@ async function scanProject(projectRoot: string): Promise<ProjectInfo> {
   try {
     await fs.access(path.join(projectRoot, 'tsconfig.json'));
     info.hasTypeScript = true;
-  } catch {
+  } catch (_err) {
     // not a TS project
   }
 
@@ -164,7 +197,7 @@ async function scanProject(projectRoot: string): Promise<ProjectInfo> {
     if (paragraphs.length > 0) {
       info.readmeIntro = paragraphs[0].replace(/\n/g, ' ').trim();
     }
-  } catch {
+  } catch (_err) {
     // no README
   }
 
@@ -172,7 +205,7 @@ async function scanProject(projectRoot: string): Promise<ProjectInfo> {
   try {
     await fs.access(path.join(projectRoot, '.env.example'));
     info.hasEnvExample = true;
-  } catch {
+  } catch (_err) {
     // no .env.example
   }
 
@@ -180,14 +213,14 @@ async function scanProject(projectRoot: string): Promise<ProjectInfo> {
   try {
     await fs.access(path.join(projectRoot, 'Dockerfile'));
     info.hasDocker = true;
-  } catch {
+  } catch (_err) {
     // no Dockerfile
   }
   if (!info.hasDocker) {
     try {
       await fs.access(path.join(projectRoot, 'docker-compose.yml'));
       info.hasDocker = true;
-    } catch {
+    } catch (_err) {
       // no docker-compose.yml
     }
   }
@@ -211,7 +244,7 @@ async function scanProject(projectRoot: string): Promise<ProjectInfo> {
         try {
           await fs.access(path.join(projectRoot, 'packages', pkgDir.name, 'src'));
           info.srcDirs.push(`packages/${pkgDir.name}/src`);
-        } catch {
+        } catch (_err) {
           // no src directory
         }
       }
@@ -229,7 +262,7 @@ async function discoverModules(projectRoot: string, srcDirs: string[]): Promise<
     let entries: Dirent[];
     try {
       entries = await fs.readdir(fullDir, { withFileTypes: true, encoding: 'utf8' });
-    } catch {
+    } catch (_err) {
       continue;
     }
 
@@ -265,7 +298,7 @@ async function listFiles(dirPath: string, maxDepth = 3, depth = 0): Promise<stri
   let entries: Dirent[];
   try {
     entries = await fs.readdir(dirPath, { withFileTypes: true, encoding: 'utf8' });
-  } catch {
+  } catch (_err) {
     return [];
   }
 

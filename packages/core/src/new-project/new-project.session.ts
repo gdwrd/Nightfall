@@ -4,11 +4,7 @@ import { randomUUID } from 'node:crypto';
 // Types
 // ---------------------------------------------------------------------------
 
-export type SessionStatus =
-  | 'gathering'
-  | 'ready_to_compile'
-  | 'spec_saved'
-  | 'plan_saved';
+export type SessionStatus = 'gathering' | 'ready_to_compile' | 'spec_saved' | 'plan_saved';
 
 export interface NewProjectSession {
   id: string;
@@ -32,9 +28,33 @@ export interface NewProjectSession {
  */
 export function deriveSlug(idea: string): string {
   const stop = new Set([
-    'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been',
-    'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from',
-    'that', 'this', 'it', 'i', 'we', 'my', 'our', 'and', 'or',
+    'a',
+    'an',
+    'the',
+    'is',
+    'are',
+    'was',
+    'were',
+    'be',
+    'been',
+    'to',
+    'of',
+    'in',
+    'for',
+    'on',
+    'with',
+    'at',
+    'by',
+    'from',
+    'that',
+    'this',
+    'it',
+    'i',
+    'we',
+    'my',
+    'our',
+    'and',
+    'or',
   ]);
 
   const words = idea

@@ -1,4 +1,5 @@
-import type { ToolImpl, ToolResult, ToolContext } from '../tool.types.js';
+import type { AgentRole } from '@nightfall/shared';
+import type { ToolImpl, ToolResult, ToolContext, ParameterSchema } from '../tool.types.js';
 
 export interface AssignTaskMessage {
   type: 'ASSIGN_TASK';
@@ -14,6 +15,14 @@ let _messageBus: ((msg: AssignTaskMessage) => void) | null = null;
 
 export function setAssignTaskBus(handler: (msg: AssignTaskMessage) => void): void {
   _messageBus = handler;
+}
+
+/** Agent message audit logger — injected by the Task Orchestrator. */
+type AssignLogFn = (from: AgentRole, to: AgentRole, type: 'assign', payload: unknown) => void;
+let _assignLogger: AssignLogFn | null = null;
+
+export function setAssignTaskLogger(fn: AssignLogFn | null): void {
+  _assignLogger = fn;
 }
 
 export const assignTaskTool: ToolImpl = {
@@ -63,6 +72,7 @@ export const assignTaskTool: ToolImpl = {
     };
 
     _messageBus?.(msg);
+    _assignLogger?.(ctx.role, 'engineer', 'assign', { subtaskId, description, assignedTo });
 
     return {
       tool: 'assign_task',
@@ -71,3 +81,7 @@ export const assignTaskTool: ToolImpl = {
     };
   },
 };
+
+export const parameterSchema: ParameterSchema[] = Object.entries(
+  assignTaskTool.definition.parameters,
+).map(([name, def]) => ({ name, ...def }));

@@ -7,7 +7,9 @@ export async function historyHandler(ctx: CommandDispatcherContext, args: string
 
   // /history rollback <snapshotId> confirm — perform the rollback
   if (trimmedArgs.startsWith('rollback ') && trimmedArgs.endsWith(' confirm')) {
-    const middle = trimmedArgs.slice('rollback '.length, trimmedArgs.length - ' confirm'.length).trim();
+    const middle = trimmedArgs
+      .slice('rollback '.length, trimmedArgs.length - ' confirm'.length)
+      .trim();
     if (!middle) return 'Invalid rollback command. Usage: /history rollback <snapshotId> confirm';
 
     try {
@@ -47,7 +49,7 @@ export async function historyHandler(ctx: CommandDispatcherContext, args: string
     const manager = new SnapshotManager(ctx.projectRoot);
     const [runs, snapshots] = await Promise.all([logger.listLogs(), manager.listSnapshots()]);
     return JSON.stringify({ type: 'history_view', runs, snapshots });
-  } catch {
+  } catch (_err) {
     return 'Could not read task history.';
   }
 }

@@ -17,6 +17,9 @@ import { ToolRegistry } from '../tools/tool.registry.js';
 import { LockRegistry } from '../locks/lock.registry.js';
 import { SnapshotManager } from '../snapshots/snapshot.manager.js';
 import { setLockRegistry } from '../tools/tools/write_diff.js';
+import { setRunCommandAbortSignal } from '../tools/tools/run_command.js';
+import { setAssignTaskLogger } from '../tools/tools/assign_task.js';
+import { setRequestReviewLogger } from '../tools/tools/request_review.js';
 import {
   createTeamLeadAgent,
   createEngineerAgent,
@@ -28,6 +31,7 @@ import {
 } from './agent.factory.js';
 import { TaskLogger } from './task.logger.js';
 import type { BaseAgent } from '../agents/agent.base.js';
+import { getModelContextWindow } from '../agents/agent.utils.js';
 import { newProjectHandler } from '../commands/handlers/new-project.handler.js';
 
 // ---------------------------------------------------------------------------
@@ -65,12 +69,15 @@ export interface TaskOrchestrator {
   on(event: 'lock:update', listener: (locks: FileLock[]) => void): this;
   /** Emitted when the orchestrator wants to inject a slash-command result (e.g. new_project routing). */
   on(event: 'slash:result', listener: (payload: { command: string; output: string }) => void): this;
+  /** Emitted when in-memory task history is cleared via clearHistory(). */
+  on(event: 'history:cleared', listener: () => void): this;
 
   emit(event: 'task:plan-ready', run: TaskRun): boolean;
   emit(event: 'task:status', run: TaskRun): boolean;
   emit(event: 'agent:state', state: AgentState): boolean;
   emit(event: 'lock:update', locks: FileLock[]): boolean;
   emit(event: 'slash:result', payload: { command: string; output: string }): boolean;
+  emit(event: 'history:cleared'): boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -94,6 +101,9 @@ export class TaskOrchestrator extends EventEmitter {
   /** Live task run state, keyed by taskId. */
   private readonly activeRuns = new Map<string, TaskRun>();
 
+  /** Snapshot errors accumulated during the current task run (cleared on each new task). */
+  private snapshotErrors: string[] = [];
+
   constructor(options: OrchestratorOptions) {
     super();
     this.options = options;
@@ -106,14 +116,30 @@ export class TaskOrchestrator extends EventEmitter {
 
     // Forward lock events so the UI can track locked files
     const emitLocks = () => this.emit('lock:update', this.lockRegistry.getLocks());
-    this.lockRegistry.on('lock_acquired', emitLocks);
-    this.lockRegistry.on('lock_released', emitLocks);
-    this.lockRegistry.on('lock_deadlock', emitLocks);
+    this.lockRegistry.on('lock:acquired', emitLocks);
+    this.lockRegistry.on('lock:released', emitLocks);
+    this.lockRegistry.on('lock:deadlock', emitLocks);
+
+    // Accumulate snapshot errors as non-fatal warnings
+    this.snapshotManager.on('snapshot:error', ({ error, context }) => {
+      this.snapshotErrors.push(`Snapshot error (${context}): ${error}`);
+    });
   }
 
   /** Return the current set of held file locks. */
   getLocks(): FileLock[] {
     return this.lockRegistry.getLocks();
+  }
+
+  /**
+   * Clear all in-memory task run state.
+   *
+   * Called by `/clear` to reset the orchestrator's internal run list.
+   * Emits `history:cleared` so the WS broadcaster can notify connected clients.
+   */
+  clearHistory(): void {
+    this.activeRuns.clear();
+    this.emit('history:cleared');
   }
 
   // ---------------------------------------------------------------------------
@@ -182,6 +208,9 @@ export class TaskOrchestrator extends EventEmitter {
     const teamLead = createTeamLeadAgent(factoryOptions, toolRegistry);
     this.wireAgentEvents(teamLead, run);
 
+    // Wire inter-agent message audit loggers for this task run
+    this.wireAgentMsgLoggers(taskId);
+
     const planResult = await teamLead.run({
       task: `Plan the following coding task:\n\n${prompt}`,
       signal,
@@ -194,6 +223,8 @@ export class TaskOrchestrator extends EventEmitter {
     }
 
     run.plan = this.parsePlan(taskId, prompt, planResult.summary);
+    // Persist team-lead token usage now so executeTask can include it in the total
+    run.tokenUsage = planResult.tokenUsage;
     run.status = 'awaiting_approval';
 
     this.activeRuns.set(taskId, run);
@@ -221,6 +252,9 @@ export class TaskOrchestrator extends EventEmitter {
     if (editedPlan) {
       run.plan = editedPlan;
     }
+
+    // Reset snapshot error accumulator before creating the pre-task snapshot
+    this.snapshotErrors = [];
 
     // Create a snapshot of all files expected to change
     const filesToSnapshot = this.gatherPlanFiles(run.plan);
@@ -266,7 +300,9 @@ export class TaskOrchestrator extends EventEmitter {
       if (signal?.aborted) return this.cancelRun(run);
 
       // ── Engineers ──────────────────────────────────────────────────────────
+      setRunCommandAbortSignal(signal ?? null);
       const engineerResults = await this.runEngineers(run, signal, factoryOptions);
+      setRunCommandAbortSignal(null);
       if (signal?.aborted) return this.cancelRun(run);
 
       // ── Reviewer ───────────────────────────────────────────────────────────
@@ -280,12 +316,19 @@ export class TaskOrchestrator extends EventEmitter {
         // ── Memory Manager ──────────────────────────────────────────────────
         const memUsage = await this.runMemoryManager(run, engineerResults, signal, factoryOptions);
 
-        // Aggregate token usage from all agents in this task
+        // Aggregate token usage from all agents in this task (team-lead usage
+        // was stored on run.tokenUsage in submitTask before approval)
         run.tokenUsage = aggregateTokenUsage([
+          run.tokenUsage,
           ...engineerResults.map((r) => r.tokenUsage),
           reviewResult.tokenUsage,
           memUsage,
         ]);
+
+        // Attach any non-fatal warnings accumulated during execution
+        if (this.snapshotErrors.length > 0) {
+          run.warnings = [...this.snapshotErrors];
+        }
 
         run.status = 'completed';
         run.completedAt = Date.now();
@@ -319,6 +362,9 @@ export class TaskOrchestrator extends EventEmitter {
     }
 
     // Exhausted rework cycles — escalate to user
+    if (this.snapshotErrors.length > 0) {
+      run.warnings = [...this.snapshotErrors];
+    }
     run.status = 'rework_limit_reached';
     run.completedAt = Date.now();
     this.emit('task:status', this.snapshot(run));
@@ -453,7 +499,7 @@ export class TaskOrchestrator extends EventEmitter {
         try {
           const typed = JSON.parse(r.summary) as Record<string, unknown>;
           return `${prefix}:\n${JSON.stringify(typed, null, 2)}`;
-        } catch {
+        } catch (_err) {
           return `${prefix}: ${r.summary}`;
         }
       })
@@ -573,7 +619,7 @@ export class TaskOrchestrator extends EventEmitter {
         parsed['idea'] = prompt;
         augmentedOutput = JSON.stringify(parsed);
       }
-    } catch {
+    } catch (_err) {
       // Not JSON — use original output
     }
 
@@ -596,7 +642,7 @@ export class TaskOrchestrator extends EventEmitter {
       const parsed = JSON.parse(summary) as Record<string, unknown>;
       if (parsed['type'] === 'question') return 'question';
       if (parsed['type'] === 'new_project') return 'new_project';
-    } catch {
+    } catch (_err) {
       // Malformed — default to coding_task (safe fallback)
     }
     return 'coding_task';
@@ -608,21 +654,43 @@ export class TaskOrchestrator extends EventEmitter {
 
   /** Build AgentFactoryOptions, loading any custom prompts from .nightfall/.agents/ */
   private async buildFactoryOptions(): Promise<AgentFactoryOptions> {
+    const agentsCfg = this.options.config.agents;
+    const maxIterations: AgentFactoryOptions['maxIterations'] = agentsCfg
+      ? {
+          'team-lead': agentsCfg['team-lead']?.max_iterations,
+          engineer: agentsCfg['engineer']?.max_iterations,
+          reviewer: agentsCfg['reviewer']?.max_iterations,
+          'memory-manager': agentsCfg['memory-manager']?.max_iterations,
+        }
+      : undefined;
+
     const options: AgentFactoryOptions = {
       provider: this.options.provider,
       projectRoot: this.options.projectRoot,
       customPrompts: {},
-      maxContextTokens: this.options.config.task.max_context_tokens,
+      maxContextTokens:
+        this.options.config.context_window ??
+        getModelContextWindow(this.options.config.provider.model) ??
+        this.options.config.task.max_context_tokens,
+      maxIterations,
+      memoryNamespace: this.options.config.memoryNamespace,
     };
 
     const agentsDir = path.join(this.options.projectRoot, '.nightfall', '.agents');
-    const roles = ['team-lead', 'engineer', 'reviewer', 'memory-manager', 'classifier', 'responder'] as const;
+    const roles = [
+      'team-lead',
+      'engineer',
+      'reviewer',
+      'memory-manager',
+      'classifier',
+      'responder',
+    ] as const;
 
     for (const role of roles) {
       try {
         const content = await fs.readFile(path.join(agentsDir, `${role}.md`), 'utf-8');
         options.customPrompts![role] = content.trim();
-      } catch {
+      } catch (_err) {
         // No custom prompt file — use default
       }
     }
@@ -635,6 +703,20 @@ export class TaskOrchestrator extends EventEmitter {
       run.agentStates[state.id] = state;
       this.activeRuns.set(run.id, run);
       this.emit('agent:state', state);
+    });
+  }
+
+  /**
+   * Wire the agent message audit loggers for the given task.
+   * Called before the team-lead agent runs so that assign_task and
+   * request_review calls are captured in the task's audit log.
+   */
+  private wireAgentMsgLoggers(taskId: string): void {
+    setAssignTaskLogger((from, to, type, payload) => {
+      this.taskLogger.logAgentMessage(taskId, from, to, type, payload);
+    });
+    setRequestReviewLogger((from, to, type, payload) => {
+      this.taskLogger.logAgentMessage(taskId, from, to, type, payload);
     });
   }
 
@@ -686,7 +768,7 @@ export class TaskOrchestrator extends EventEmitter {
     } catch (err) {
       process.stderr.write(
         `[nightfall] parsePlan: Team Lead response is not valid JSON — ` +
-        `falling back to single subtask. Error: ${err instanceof Error ? err.message : String(err)}\n`,
+          `falling back to single subtask. Error: ${err instanceof Error ? err.message : String(err)}\n`,
       );
       return {
         taskId,
@@ -759,7 +841,7 @@ function extractFilesTouched(log: AgentLogEntry[]): string[] {
         const filePath = String(call.parameters['path'] ?? '').trim();
         if (filePath) files.add(filePath);
       }
-    } catch {
+    } catch (_err) {
       // Malformed log entry — skip
     }
   }
@@ -793,10 +875,10 @@ function parseReviewResult(summary: string): ReviewResult {
       issues,
       notes: String(parsed['notes'] ?? ''),
     };
-  } catch {
+  } catch (_err) {
     return {
       passed: false,
-      issues: ['Reviewer response could not be parsed as JSON'],
+      issues: [],
       notes: summary,
     };
   }
@@ -869,7 +951,7 @@ function isBlockedEngineer(summary: string): boolean {
   try {
     const parsed = JSON.parse(summary) as Record<string, unknown>;
     return parsed['confidence'] === 'blocked';
-  } catch {
+  } catch (_err) {
     return false;
   }
 }

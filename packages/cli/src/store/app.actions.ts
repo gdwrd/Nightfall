@@ -6,7 +6,12 @@ import type {
   ProviderLifecycleEvent,
   SnapshotMeta,
 } from '@nightfall/shared';
-import type { AppPhase, ModelViewData, SettingsViewData, NewProjectWizardData } from './app.store.js';
+import type {
+  AppPhase,
+  ModelViewData,
+  SettingsViewData,
+  NewProjectWizardData,
+} from './app.store.js';
 
 // ---------------------------------------------------------------------------
 // Action Types
@@ -30,4 +35,6 @@ export type AppAction =
   | { type: 'SET_NEW_PROJECT'; data: NewProjectWizardData }
   | { type: 'UPDATE_NEW_PROJECT'; partial: Partial<NewProjectWizardData> }
   | { type: 'APPEND_NEW_PROJECT_HISTORY'; entry: { role: 'user' | 'assistant'; content: string } }
-  | { type: 'CLEAR_NEW_PROJECT' };
+  | { type: 'CLEAR_NEW_PROJECT' }
+  | { type: 'HISTORY_CLEARED' }
+  | { type: 'PLAN_EDIT_FAILED'; message: string };
