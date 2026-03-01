@@ -45,6 +45,7 @@ You submit a task
 | Document | Description |
 |---|---|
 | [Getting Started](docs/getting-started.md) | Requirements, installation, first run |
+| [Build from Source](docs/build-from-source.md) | Clone, build, and run the project locally |
 | [Configuration](docs/configuration.md) | Config file reference, model selection, providers |
 | [Usage Guide](docs/usage.md) | Submitting tasks, approving plans, slash commands |
 | [Agent Team](docs/agents.md) | Agent roles, protocols, and custom prompt overrides |

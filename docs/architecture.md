@@ -73,21 +73,32 @@ The terminal UI built with [ink](https://github.com/vadimdemedes/ink) (React for
 
 ## Development
 
+See **[Build from Source](build-from-source.md)** for a full step-by-step guide. The quick reference is below.
+
 ### Setup
 
 ```bash
 git clone https://github.com/gdwrd/Nightfall.git
 cd Nightfall
 npm install
+npm run build
 ```
 
 ### Commands
 
 ```bash
-npm run build   # compile all packages (via turbo)
-npm run lint    # eslint across all packages
+npm run build   # compile all packages in dependency order (via turbo)
+npm run dev     # watch mode for all packages in parallel
 npm run test    # vitest across all packages
-npm run dev     # watch mode for all packages
+npm run lint    # eslint across all packages
+```
+
+### Running a single package
+
+```bash
+cd packages/core && npm run build   # compile core only
+cd packages/cli  && npm run build   # bundle CLI only
+cd packages/core && npx vitest run  # test core only
 ```
 
 ### Publishing
@@ -96,12 +107,30 @@ npm run dev     # watch mode for all packages
 npm run release # build + test + publish packages/cli to npm
 ```
 
+### Build dependency order
+
+Turborepo enforces the following order via `"dependsOn": ["^build"]` in `turbo.json`:
+
+1. `@nightfall/shared` — no upstream dependencies
+2. `@nightfall/core` — depends on `shared`
+3. `nightfall` (CLI) — depends on both; esbuild bundles everything in one pass
+
+### Module systems
+
+| Package | Output | Compiler |
+|---|---|---|
+| `@nightfall/shared` | CommonJS | `tsc` |
+| `@nightfall/core` | CommonJS | `tsc` |
+| `nightfall` (CLI) | ESM bundle | `esbuild` |
+
+The CLI esbuild config (`packages/cli/esbuild.config.mjs`) has a workspace resolve plugin that points `@nightfall/shared` and `@nightfall/core` imports at their TypeScript sources directly, so no pre-built `dist/` is required for the CLI build.
+
 ### Tech Stack
 
 - **TypeScript** — strict mode across all packages
 - **Turborepo** — monorepo build orchestration
 - **ink** — React-based terminal UI
-- **Vitest** — unit testing
-- **ESLint** — flat config linting
+- **Vitest** — unit testing (`.mts` config required for vitest 4.x / vite 6.x)
+- **ESLint** — flat config (v9) linting
 - **esbuild** — production bundling with workspace resolve plugin
 - **WebSocket (ws)** — core ↔ CLI communication
