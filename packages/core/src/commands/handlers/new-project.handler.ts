@@ -130,7 +130,14 @@ async function handleAnswer(
 }
 
 function handleDone(sessionId: string): string {
-  const session = getSessionOrThrow(sessionId);
+  // Support bare /done without sessionId (same pattern as handleCancel)
+  let session = sessionManager.get(sessionId);
+  if (!session && !sessionId) {
+    session = sessionManager.getAnyActive();
+  }
+  if (!session) {
+    throw new HandlerError('Session expired or not found. Start over with /new-project.');
+  }
 
   const hasUserAnswers = session.history.some((h) => h.role === 'user');
   if (!hasUserAnswers) {
@@ -158,9 +165,11 @@ async function handleGenerateSpec(
   const provider = ctx.provider;
 
   const conversationText = formatConversation(session);
+  // Use a function replacer to avoid $1, $&, etc. being interpreted as
+  // special replacement patterns when the conversation contains dollar signs.
   const systemPrompt = SPEC_COMPILATION_PROMPT.replace(
     '{conversation_history}',
-    conversationText,
+    () => conversationText,
   );
 
   let spec: string;
@@ -214,7 +223,8 @@ async function handleGeneratePlan(
     sessionManager.delete(session.id);
     throw err;
   }
-  const systemPrompt = DEV_PLAN_PROMPT.replace('{specification}', specContent);
+  // Use a function replacer to avoid $-pattern interpretation in spec content.
+  const systemPrompt = DEV_PLAN_PROMPT.replace('{specification}', () => specContent);
 
   let plan: string;
   try {
