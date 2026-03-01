@@ -1,6 +1,21 @@
 import type { ToolDefinition } from '../tools/tool.types.js';
 
 /**
+ * System prompt used by the memory compaction routine.
+ * Instructs the LLM to summarize and deduplicate memory file entries
+ * while preserving all unique learnings.
+ */
+export const COMPACT_MEMORY_SYSTEM_PROMPT = `You are a memory compaction assistant. Your task is to summarize and deduplicate the memory entries in a markdown file.
+
+Rules:
+- Preserve ALL unique learnings, patterns, and architectural decisions
+- Remove exact duplicates and near-duplicates (same information expressed differently)
+- Merge closely related entries into concise, combined entries
+- Keep the same markdown format as the input (headings, bullet points, etc.)
+- Do not add new information or change the meaning of existing entries
+- Do not include explanations, preamble, or commentary — output ONLY the compacted markdown content`;
+
+/**
  * Render a list of tool definitions as a compact markdown description
  * the LLM can use to understand what tools are available.
  */

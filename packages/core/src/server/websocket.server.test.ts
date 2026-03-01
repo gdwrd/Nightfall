@@ -106,7 +106,7 @@ function collectUntil(
           clearTimeout(timer);
           done();
         }
-      } catch {
+      } catch (_err) {
         /* ignore */
       }
     });

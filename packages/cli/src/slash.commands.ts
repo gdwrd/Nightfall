@@ -13,12 +13,14 @@ export const SLASH_COMMANDS: Record<string, string> = {
   '/history': 'List recent task runs',
   '/config': 'Show current configuration',
   '/agents': 'Show active agent configurations',
-  '/clear': 'Clear message log',
+  '/clear': 'Clear task history and reset task state',
   '/help': 'Show all available commands',
-  '/compact': 'Compress conversation history (future feature)',
+  '/compact': 'Compact memory bank files using LLM summarization',
   '/model': 'Pick active model for current provider',
   '/settings': 'Edit all configuration settings',
   '/new-project': 'Start a guided wizard to spec out a new project',
+  '/undo': 'Roll back the most recent task (or /undo <task-id> for a specific task)',
+  '/export': 'Export task history and memory to a markdown file (--history / --memory flags)',
 };
 
 // ---------------------------------------------------------------------------

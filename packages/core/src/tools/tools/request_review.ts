@@ -1,4 +1,5 @@
-import type { ToolImpl, ToolResult, ToolContext } from '../tool.types.js';
+import type { AgentRole } from '@nightfall/shared';
+import type { ToolImpl, ToolResult, ToolContext, ParameterSchema } from '../tool.types.js';
 
 export interface RequestReviewMessage {
   type: 'REQUEST_REVIEW';
@@ -14,6 +15,14 @@ let _messageBus: ((msg: RequestReviewMessage) => void) | null = null;
 
 export function setRequestReviewBus(handler: (msg: RequestReviewMessage) => void): void {
   _messageBus = handler;
+}
+
+/** Agent message audit logger — injected by the Task Orchestrator. */
+type ReviewLogFn = (from: AgentRole, to: AgentRole, type: 'review', payload: unknown) => void;
+let _reviewLogger: ReviewLogFn | null = null;
+
+export function setRequestReviewLogger(fn: ReviewLogFn | null): void {
+  _reviewLogger = fn;
 }
 
 export const requestReviewTool: ToolImpl = {
@@ -34,7 +43,7 @@ export const requestReviewTool: ToolImpl = {
       filesChanged: {
         type: 'string',
         description: 'Comma-separated list of files that were changed.',
-        required: true,
+        required: false,
       },
     },
   },
@@ -70,6 +79,7 @@ export const requestReviewTool: ToolImpl = {
     };
 
     _messageBus?.(msg);
+    _reviewLogger?.(ctx.role, 'reviewer', 'review', { subtaskId, summary, filesChanged });
 
     return {
       tool: 'request_review',
@@ -78,3 +88,7 @@ export const requestReviewTool: ToolImpl = {
     };
   },
 };
+
+export const parameterSchema: ParameterSchema[] = Object.entries(requestReviewTool.definition.parameters).map(
+  ([name, def]) => ({ name, ...def }),
+);

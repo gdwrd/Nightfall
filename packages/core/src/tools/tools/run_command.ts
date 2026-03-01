@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
-import type { ToolImpl, ToolResult, ToolContext } from '../tool.types.js';
+import type { ToolImpl, ToolResult, ToolContext, ParameterSchema } from '../tool.types.js';
+import { resolveAndValidatePath } from './path.utils.js';
 
 const MAX_OUTPUT_CHARS = 8_000;
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -46,7 +47,21 @@ export const runCommandTool: ToolImpl = {
       };
     }
 
-    const cwd = params['cwd'] ? String(params['cwd']) : ctx.projectRoot;
+    let cwd: string;
+    if (params['cwd']) {
+      try {
+        cwd = resolveAndValidatePath(String(params['cwd']), ctx.projectRoot);
+      } catch (_err) {
+        return {
+          tool: 'run_command',
+          success: false,
+          output: '',
+          error: `Invalid cwd: path resolves outside the project root`,
+        };
+      }
+    } else {
+      cwd = ctx.projectRoot;
+    }
     const rawTimeout =
       params['timeoutMs'] != null ? Number(params['timeoutMs']) : DEFAULT_TIMEOUT_MS;
     const timeoutMs = Math.min(Math.max(rawTimeout, 0), MAX_TIMEOUT_MS);
@@ -73,7 +88,7 @@ export const runCommandTool: ToolImpl = {
       const killProc = () => {
         try {
           proc.kill('SIGKILL');
-        } catch {
+        } catch (_err) {
           /* already dead */
         }
       };
@@ -147,3 +162,7 @@ function truncateOutput(output: string): string {
   const omitted = output.length - HEAD - TAIL;
   return `${output.slice(0, HEAD)}\n[... ${omitted} bytes omitted ...]\n${output.slice(-TAIL)}`;
 }
+
+export const parameterSchema: ParameterSchema[] = Object.entries(runCommandTool.definition.parameters).map(
+  ([name, def]) => ({ name, ...def }),
+);

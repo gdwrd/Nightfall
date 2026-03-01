@@ -1,5 +1,5 @@
 import * as fs from 'node:fs/promises';
-import type { ToolImpl, ToolResult, ToolContext } from '../tool.types.js';
+import type { ToolImpl, ToolResult, ToolContext, ParameterSchema } from '../tool.types.js';
 import { resolveAndValidatePath } from './path.utils.js';
 
 /**
@@ -10,21 +10,26 @@ import { resolveAndValidatePath } from './path.utils.js';
  * It works by finding the declaration line and then matching braces/indentation to
  * determine the end of the block.
  */
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function findSymbolRange(lines: string[], symbol: string): [number, number] | null {
+  const esc = escapeRegExp(symbol);
   // Patterns that declare a named symbol at the top level
   const declarationPatterns = [
     // class Foo / export class Foo / export default class Foo
-    new RegExp(`^(?:export\\s+(?:default\\s+)?)?(?:abstract\\s+)?class\\s+${symbol}[\\s<{(]`),
+    new RegExp(`^(?:export\\s+(?:default\\s+)?)?(?:abstract\\s+)?class\\s+${esc}[\\s<{(]`),
     // function foo / export function foo / export async function foo
-    new RegExp(`^(?:export\\s+)?(?:async\\s+)?function\\s+${symbol}[\\s(<]`),
+    new RegExp(`^(?:export\\s+)?(?:async\\s+)?function\\s+${esc}[\\s(<]`),
     // export const foo = / const foo = (for arrow functions or objects)
-    new RegExp(`^(?:export\\s+)?(?:const|let|var)\\s+${symbol}\\s*[=:]`),
+    new RegExp(`^(?:export\\s+)?(?:const|let|var)\\s+${esc}\\s*[=:]`),
     // interface Foo / export interface Foo
-    new RegExp(`^(?:export\\s+)?interface\\s+${symbol}[\\s<{]`),
+    new RegExp(`^(?:export\\s+)?interface\\s+${esc}[\\s<{]`),
     // type Foo = / export type Foo =
-    new RegExp(`^(?:export\\s+)?type\\s+${symbol}\\s*[=<]`),
+    new RegExp(`^(?:export\\s+)?type\\s+${esc}\\s*[=<]`),
     // enum Foo / export enum Foo / export const enum Foo
-    new RegExp(`^(?:export\\s+)?(?:const\\s+)?enum\\s+${symbol}[\\s{]`),
+    new RegExp(`^(?:export\\s+)?(?:const\\s+)?enum\\s+${esc}[\\s{]`),
   ];
 
   let startLine = -1;
@@ -170,3 +175,7 @@ export const readFileTool: ToolImpl = {
     return { tool: 'read_file', success: true, output: content };
   },
 };
+
+export const parameterSchema: ParameterSchema[] = Object.entries(readFileTool.definition.parameters).map(
+  ([name, def]) => ({ name, ...def }),
+);

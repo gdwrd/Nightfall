@@ -21,3 +21,6 @@ Thumbs.db
 
 # Nightfall runtime
 .nightfall/
+
+# ralphex progress logs
+.ralphex/progress/

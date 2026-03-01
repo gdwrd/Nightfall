@@ -5,6 +5,7 @@ import {
   type ToolResult,
   type ToolContext,
   ToolNotAllowedError,
+  validateToolParams,
 } from './tool.types.js';
 import { readMemoryTool } from './tools/read_memory.js';
 import { readFileTool } from './tools/read_file.js';
@@ -68,6 +69,16 @@ export class ToolRegistry {
         success: false,
         output: '',
         error: `Unknown tool: "${call.tool}"`,
+      };
+    }
+
+    const validation = validateToolParams(call.parameters, impl.definition.parameters);
+    if (!validation.valid) {
+      return {
+        tool: call.tool,
+        success: false,
+        output: '',
+        error: `Invalid parameters: ${validation.errors.join(', ')}`,
       };
     }
 

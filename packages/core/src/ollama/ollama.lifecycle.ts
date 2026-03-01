@@ -10,7 +10,7 @@ export function isOllamaInstalled(): boolean {
   try {
     execFileSync('which', ['ollama'], { stdio: 'ignore' });
     return true;
-  } catch {
+  } catch (_err) {
     return false;
   }
 }
@@ -26,7 +26,7 @@ export async function isOllamaRunning(host: string, port: number): Promise<boole
     const response = await fetch(url, { signal: controller.signal });
     clearTimeout(timeout);
     return response.ok || response.status < 500;
-  } catch {
+  } catch (_err) {
     return false;
   }
 }
@@ -69,7 +69,7 @@ export async function isModelAvailable(
     const models = data.models ?? [];
     // Ollama model names can have tags; check exact match or prefix match
     return models.some((m) => m.name === model || m.name.startsWith(`${model}:`));
-  } catch {
+  } catch (_err) {
     return false;
   }
 }
@@ -139,7 +139,7 @@ export async function pullModel(
         } else if (json.status === 'success') {
           onProgress(100);
         }
-      } catch {
+      } catch (_err) {
         // Non-JSON line — ignore
       }
     }
@@ -148,7 +148,7 @@ export async function pullModel(
 
 /**
  * Full Ollama lifecycle: detect → (start) → validate model → (pull model).
- * Emits structured events for the UI to display. Exits process on fatal error.
+ * Emits structured events for the UI to display. Throws on fatal error.
  */
 export async function ensureOllama(
   config: NightfallConfig,
@@ -165,11 +165,9 @@ export async function ensureOllama(
 
   if (!running) {
     if (!isOllamaInstalled()) {
-      onEvent({
-        type: 'fatal',
-        message: 'Ollama is required. Install at https://ollama.ai',
-      });
-      process.exit(1);
+      const msg = 'Ollama is required. Install at https://ollama.ai';
+      onEvent({ type: 'fatal', message: msg });
+      throw new Error(msg);
     }
 
     onEvent({ type: 'starting' });
@@ -177,15 +175,17 @@ export async function ensureOllama(
       await startOllama(host, port);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      onEvent({ type: 'fatal', message: `Failed to start Ollama: ${message}` });
-      process.exit(1);
+      const msg = `Failed to start Ollama: ${message}`;
+      onEvent({ type: 'fatal', message: msg });
+      throw new Error(msg);
     }
 
     // Verify Ollama is reachable after startup attempt
     const nowRunning = await isOllamaRunning(host, port);
     if (!nowRunning) {
-      onEvent({ type: 'fatal', message: 'Ollama is not reachable after startup attempt.' });
-      process.exit(1);
+      const msg = 'Ollama is not reachable after startup attempt.';
+      onEvent({ type: 'fatal', message: msg });
+      throw new Error(msg);
     }
   }
 
@@ -203,8 +203,9 @@ export async function ensureOllama(
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      onEvent({ type: 'fatal', message: `Failed to pull model "${model}": ${message}` });
-      process.exit(1);
+      const msg = `Failed to pull model "${model}": ${message}`;
+      onEvent({ type: 'fatal', message: msg });
+      throw new Error(msg);
     }
   }
 
@@ -224,7 +225,7 @@ export async function ensureOllama(
         if (ctxKey) contextLength = modelInfo[ctxKey] as number;
       }
     }
-  } catch {
+  } catch (_err) {
     // non-fatal — context length is optional
   }
 

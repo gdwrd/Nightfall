@@ -12,3 +12,10 @@ export interface MemoryComponentEntry {
   file: string; // relative to .nightfall/memory/
   description: string;
 }
+
+export interface CompactionResult {
+  file: string;
+  before: number;
+  after: number;
+  removed: number;
+}

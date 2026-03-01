@@ -227,6 +227,13 @@ export interface AgentFactoryOptions {
    * When exceeded the oldest tool-call/result pairs are compacted.
    */
   maxContextTokens?: number;
+  /**
+   * Per-role max iteration overrides. When provided, these replace the factory
+   * hardcoded defaults (team-lead: 20, engineer: 30, reviewer: 20, memory-manager: 20).
+   */
+  maxIterations?: Partial<Record<'team-lead' | 'engineer' | 'reviewer' | 'memory-manager', number>>;
+  /** Optional memory namespace override passed to each agent's ToolContext. */
+  memoryNamespace?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -242,8 +249,9 @@ export function createTeamLeadAgent(
     role: 'team-lead',
     projectRoot: options.projectRoot,
     systemPrompt: options.customPrompts?.['team-lead'] ?? TEAM_LEAD_PROMPT,
-    maxIterations: 20,
+    maxIterations: options.maxIterations?.['team-lead'] ?? 20,
     maxContextTokens: options.maxContextTokens,
+    memoryNamespace: options.memoryNamespace,
   };
   return new BaseAgent(config, options.provider, toolRegistry);
 }
@@ -258,8 +266,9 @@ export function createEngineerAgent(
     role: 'engineer',
     projectRoot: options.projectRoot,
     systemPrompt: options.customPrompts?.['engineer'] ?? ENGINEER_PROMPT,
-    maxIterations: 30,
+    maxIterations: options.maxIterations?.['engineer'] ?? 30,
     maxContextTokens: options.maxContextTokens,
+    memoryNamespace: options.memoryNamespace,
   };
   return new BaseAgent(config, options.provider, toolRegistry);
 }
@@ -273,8 +282,9 @@ export function createReviewerAgent(
     role: 'reviewer',
     projectRoot: options.projectRoot,
     systemPrompt: options.customPrompts?.['reviewer'] ?? REVIEWER_PROMPT,
-    maxIterations: 20,
+    maxIterations: options.maxIterations?.['reviewer'] ?? 20,
     maxContextTokens: options.maxContextTokens,
+    memoryNamespace: options.memoryNamespace,
   };
   return new BaseAgent(config, options.provider, toolRegistry);
 }
@@ -288,8 +298,9 @@ export function createMemoryManagerAgent(
     role: 'memory-manager',
     projectRoot: options.projectRoot,
     systemPrompt: options.customPrompts?.['memory-manager'] ?? MEMORY_MANAGER_PROMPT,
-    maxIterations: 20,
+    maxIterations: options.maxIterations?.['memory-manager'] ?? 20,
     maxContextTokens: options.maxContextTokens,
+    memoryNamespace: options.memoryNamespace,
   };
   return new BaseAgent(config, options.provider, toolRegistry);
 }
@@ -305,6 +316,7 @@ export function createClassifierAgent(
     systemPrompt: options.customPrompts?.['classifier'] ?? CLASSIFIER_PROMPT,
     maxIterations: 1,
     maxContextTokens: options.maxContextTokens,
+    memoryNamespace: options.memoryNamespace,
   };
   return new BaseAgent(config, options.provider, toolRegistry);
 }
@@ -320,6 +332,7 @@ export function createResponderAgent(
     systemPrompt: options.customPrompts?.['responder'] ?? RESPONDER_PROMPT,
     maxIterations: 10,
     maxContextTokens: options.maxContextTokens,
+    memoryNamespace: options.memoryNamespace,
   };
   return new BaseAgent(config, options.provider, toolRegistry);
 }

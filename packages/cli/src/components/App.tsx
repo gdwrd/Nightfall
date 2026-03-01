@@ -59,6 +59,7 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
     contextLength,
     modelViewData,
     settingsViewData,
+    lastTaskTokens,
   } = state;
   const [inputValue, setInputValue] = useState('');
   const [awaitingInitConfirm, setAwaitingInitConfirm] = useState(false);
@@ -130,6 +131,15 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
       // Detect successful /init so the InfoBar updates without restart
       if (payload.command === '/init' && payload.output.startsWith('✓ Memory bank initialized')) {
         setMemoryBankReady(true);
+      }
+
+      if (payload.command === '/clear') {
+        setAwaitingInitConfirm(false);
+        dispatch({ type: 'HISTORY_CLEARED' });
+        if (payload.output) {
+          dispatch({ type: 'ADD_MESSAGE', message: `✓ ${payload.output}` });
+        }
+        return;
       }
 
       if (payload.command === '/history') {
@@ -420,14 +430,6 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
         return;
       }
 
-      // Handle clear locally — resets CLI state only
-      if (lower === '/clear') {
-        setAwaitingInitConfirm(false);
-        dispatch({ type: 'CLEAR_MESSAGES' });
-        dispatch({ type: 'SET_SLASH_OUTPUT', output: null });
-        return;
-      }
-
       // Clear any stale slash output before sending the new command
       dispatch({ type: 'SET_SLASH_OUTPUT', output: null });
 
@@ -474,16 +476,25 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
         dispatch({ type: 'SET_PHASE', phase: 'editing_plan' });
         // Defer so ink can release the terminal before spawning the editor
         setTimeout(() => {
-          process.stdin.setRawMode?.(false);
-          const edited = editPlanInEditor(activeRun.plan!);
-          process.stdin.setRawMode?.(true);
-          if (edited) {
-            dispatch({ type: 'UPDATE_PLAN', plan: edited });
-            addMessage('Plan updated from editor.');
-          } else {
-            addMessage('No changes made.');
-          }
-          dispatch({ type: 'SET_PHASE', phase: 'awaiting_approval' });
+          void (async () => {
+            process.stdin.setRawMode?.(false);
+            const result = await editPlanInEditor(activeRun.plan!);
+            process.stdin.setRawMode?.(true);
+            switch (result.kind) {
+              case 'changed':
+                dispatch({ type: 'UPDATE_PLAN', plan: result.plan });
+                addMessage('Plan updated from editor.');
+                dispatch({ type: 'SET_PHASE', phase: 'awaiting_approval' });
+                break;
+              case 'unchanged':
+                addMessage('No changes made.');
+                dispatch({ type: 'SET_PHASE', phase: 'awaiting_approval' });
+                break;
+              case 'failed':
+                dispatch({ type: 'PLAN_EDIT_FAILED', message: result.message });
+                break;
+            }
+          })();
         }, 50);
         return;
       }
@@ -661,7 +672,9 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
           (phase === 'running' || phase === 'planning' || phase === 'completed') && (
             <>
               <AgentGrid agentStates={agentStates} engineerCount={engineerCount} />
-              {locks.length > 0 && <StatusBar locks={locks} />}
+              {(locks.length > 0 || lastTaskTokens) && (
+                <StatusBar locks={locks} lastTaskTokens={lastTaskTokens} />
+              )}
             </>
           )}
 

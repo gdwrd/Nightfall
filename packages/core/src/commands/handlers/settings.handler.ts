@@ -29,12 +29,15 @@ export async function settingsHandler(
     let incoming: NightfallConfig;
     try {
       incoming = JSON.parse(jsonStr) as NightfallConfig;
-    } catch {
+    } catch (_err) {
       return JSON.stringify({ type: 'error', message: 'Invalid settings JSON.' } satisfies ErrorPayload);
     }
 
     try {
       writeConfig(incoming);
+      // Reload into the in-memory context so subsequent command handlers (e.g. /status,
+      // /config) see the updated values without requiring a server restart.
+      Object.assign(ctx.config, incoming);
       return JSON.stringify({ type: 'settings_saved', config: incoming } satisfies SettingsSavedPayload);
     } catch (err) {
       return JSON.stringify({

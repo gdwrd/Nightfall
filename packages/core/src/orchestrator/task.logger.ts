@@ -1,6 +1,6 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import type { TaskRun } from '@nightfall/shared';
+import type { TaskRun, AgentMessage, AgentRole } from '@nightfall/shared';
 
 const LOGS_DIR = '.nightfall/logs';
 
@@ -17,6 +17,25 @@ function sanitizeFilename(str: string): string {
 export class TaskLogger {
   constructor(private readonly projectRoot: string) {}
 
+  /** In-memory buffer of agent messages, keyed by taskId. Drained into the run on saveLog. */
+  private readonly agentMsgBuffer = new Map<string, AgentMessage[]>();
+
+  /**
+   * Record an inter-agent message for the given task.
+   * Buffered in memory until saveLog() drains it into the persisted TaskRun JSON.
+   */
+  logAgentMessage(
+    taskId: string,
+    from: AgentRole,
+    to: AgentRole,
+    type: 'assign' | 'review',
+    payload: unknown,
+  ): void {
+    const msgs = this.agentMsgBuffer.get(taskId) ?? [];
+    msgs.push({ timestamp: new Date().toISOString(), from, to, type, payload });
+    this.agentMsgBuffer.set(taskId, msgs);
+  }
+
   private logsDir(): string {
     return path.join(this.projectRoot, LOGS_DIR);
   }
@@ -24,9 +43,18 @@ export class TaskLogger {
   /**
    * Persist a TaskRun to disk as a JSON log file.
    * Filename: <ISO timestamp>_<prompt-slug>.json
+   *
+   * Any buffered agent messages for this task are merged into the run before writing.
    */
   async saveLog(taskRun: TaskRun): Promise<void> {
     await fs.mkdir(this.logsDir(), { recursive: true });
+
+    // Drain agent message buffer into the run
+    const taskId = taskRun.id;
+    const bufferedMsgs = this.agentMsgBuffer.get(taskId);
+    if (bufferedMsgs && bufferedMsgs.length > 0) {
+      taskRun = { ...taskRun, agent_messages: bufferedMsgs };
+    }
 
     const date = new Date(taskRun.startedAt);
     // e.g. "2024-01-15T14-32-00"
@@ -42,6 +70,10 @@ export class TaskLogger {
       JSON.stringify(taskRun, null, 2),
       'utf-8',
     );
+
+    // Delete the buffer only after the write succeeds so messages are not
+    // lost if the write fails.
+    this.agentMsgBuffer.delete(taskId);
   }
 
   /**
@@ -51,7 +83,7 @@ export class TaskLogger {
     let entries: string[];
     try {
       entries = await fs.readdir(this.logsDir());
-    } catch {
+    } catch (_err) {
       return [];
     }
 
@@ -60,7 +92,7 @@ export class TaskLogger {
       try {
         const content = await fs.readFile(path.join(this.logsDir(), entry), 'utf-8');
         logs.push(JSON.parse(content) as TaskRun);
-      } catch {
+      } catch (_err) {
         // Skip malformed log files
       }
     }
@@ -76,7 +108,7 @@ export class TaskLogger {
     let entries: string[];
     try {
       entries = await fs.readdir(this.logsDir());
-    } catch {
+    } catch (_err) {
       return;
     }
 

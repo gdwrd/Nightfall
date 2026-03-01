@@ -11,6 +11,8 @@ function formatEvent(event: ProviderLifecycleEvent): { label: string; color: str
   switch (event.type) {
     case 'detecting':
       return { label: 'Detecting provider...', color: THEME.dim };
+    case 'provider_check':
+      return { label: 'Checking provider health...', color: THEME.dim };
     case 'starting':
       return { label: 'Starting local provider...', color: THEME.primary };
     case 'ready':
@@ -30,12 +32,24 @@ function formatEvent(event: ProviderLifecycleEvent): { label: string; color: str
       return { label: 'API key validated', color: THEME.success };
     case 'fatal':
       return { label: `Fatal: ${event.message}`, color: THEME.error };
+    case 'provider_error':
+      return { label: event.error, color: THEME.error };
   }
 }
 
 export const LifecycleView: React.FC<LifecycleViewProps> = ({ event }) => {
   const { label, color } = formatEvent(event);
   const isPulling = event.type === 'pulling_model';
+  const isProviderError = event.type === 'provider_error';
+
+  const troubleshootingHint =
+    isProviderError && event.error.toLowerCase().includes('ollama')
+      ? 'Run: ollama serve'
+      : isProviderError && event.error.toLowerCase().includes('openrouter')
+        ? 'Set: export OPENROUTER_API_KEY=<your-key>'
+        : isProviderError
+          ? 'Check your provider configuration in .nightfall/config.yaml'
+          : null;
 
   return (
     <Box flexDirection="column" paddingY={1} paddingX={2}>
@@ -48,6 +62,16 @@ export const LifecycleView: React.FC<LifecycleViewProps> = ({ event }) => {
       {isPulling && (
         <Box marginTop={1}>
           <ProgressBar value={event.progress} />
+        </Box>
+      )}
+      {isProviderError && (
+        <Box marginTop={1} flexDirection="column" borderStyle="round" borderColor={THEME.error} paddingX={1}>
+          <Text color={THEME.error} bold>Provider Error</Text>
+          <Text color={THEME.dim}>Nightfall cannot connect to the configured provider.</Text>
+          {troubleshootingHint && (
+            <Text color={THEME.dim}>Fix: {troubleshootingHint}</Text>
+          )}
+          <Text color={THEME.dim}>Then restart Nightfall.</Text>
         </Box>
       )}
     </Box>

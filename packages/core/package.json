@@ -14,6 +14,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
     "@nightfall/shared": "*",
     "@types/diff": "^7.0.2",
     "@types/js-yaml": "^4.0.9",

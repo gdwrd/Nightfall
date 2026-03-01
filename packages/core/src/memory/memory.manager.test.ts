@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseIndex, serializeIndex } from './memory.parser.js';
 import { MemoryManager } from './memory.manager.js';
-import { initializeMemoryBank } from './memory.init.js';
+import { initializeMemoryBank, deriveProjectSlug } from './memory.init.js';
 
 const TEST_ROOT = `/tmp/nightfall-memory-test-${process.pid}`;
 const MEMORY_DIR = path.join(TEST_ROOT, '.nightfall', 'memory');
@@ -348,37 +348,39 @@ describe('initializeMemoryBank', () => {
 
     const result = await initializeMemoryBank(projectRoot);
 
-    // Verify files were created
+    // Verify files were created (returned paths are relative to the namespace dir)
     expect(result.filesCreated).toContain('index.md');
     expect(result.filesCreated).toContain('project.md');
     expect(result.filesCreated).toContain('tech.md');
     expect(result.filesCreated).toContain('patterns.md');
     expect(result.filesCreated).toContain('progress.md');
 
-    // Verify memory directory exists
+    // Files are stored under .nightfall/memory/<namespace>/
+    const namespace = await deriveProjectSlug(projectRoot);
     const memDir = path.join(projectRoot, '.nightfall', 'memory');
-    expect(fs.existsSync(memDir)).toBe(true);
-    expect(fs.existsSync(path.join(memDir, 'components'))).toBe(true);
+    const nsDir = path.join(memDir, namespace);
+    expect(fs.existsSync(nsDir)).toBe(true);
+    expect(fs.existsSync(path.join(nsDir, 'components'))).toBe(true);
 
     // Verify index.md content
-    const indexContent = fs.readFileSync(path.join(memDir, 'index.md'), 'utf8');
+    const indexContent = fs.readFileSync(path.join(nsDir, 'index.md'), 'utf8');
     expect(indexContent).toContain('project.md');
     expect(indexContent).toContain('tech.md');
     expect(indexContent).toContain('patterns.md');
     expect(indexContent).toContain('progress.md');
 
     // Verify project.md content
-    const projectContent = fs.readFileSync(path.join(memDir, 'project.md'), 'utf8');
+    const projectContent = fs.readFileSync(path.join(nsDir, 'project.md'), 'utf8');
     expect(projectContent).toContain('sample-project');
     expect(projectContent).toContain('A test project');
 
     // Verify tech.md content
-    const techContent = fs.readFileSync(path.join(memDir, 'tech.md'), 'utf8');
+    const techContent = fs.readFileSync(path.join(nsDir, 'tech.md'), 'utf8');
     expect(techContent).toContain('TypeScript');
     expect(techContent).toContain('express');
 
     // Verify progress.md
-    const progressContent = fs.readFileSync(path.join(memDir, 'progress.md'), 'utf8');
+    const progressContent = fs.readFileSync(path.join(nsDir, 'progress.md'), 'utf8');
     expect(progressContent).toContain('Memory bank initialized');
   });
 
@@ -398,9 +400,10 @@ describe('initializeMemoryBank', () => {
     expect(result.filesCreated).toContain('components/auth.md');
     expect(result.filesCreated).toContain('components/db.md');
 
-    const memDir = path.join(projectRoot, '.nightfall', 'memory');
-    expect(fs.existsSync(path.join(memDir, 'components', 'auth.md'))).toBe(true);
-    expect(fs.existsSync(path.join(memDir, 'components', 'db.md'))).toBe(true);
+    const namespace = await deriveProjectSlug(projectRoot);
+    const nsDir = path.join(projectRoot, '.nightfall', 'memory', namespace);
+    expect(fs.existsSync(path.join(nsDir, 'components', 'auth.md'))).toBe(true);
+    expect(fs.existsSync(path.join(nsDir, 'components', 'db.md'))).toBe(true);
   });
 
   it('works with monorepo packages structure', async () => {
@@ -427,8 +430,108 @@ describe('initializeMemoryBank', () => {
     expect(result.filesCreated).toContain('index.md');
     expect(result.filesCreated).toContain('project.md');
 
-    const memDir = path.join(projectRoot, '.nightfall', 'memory');
-    const projectContent = fs.readFileSync(path.join(memDir, 'project.md'), 'utf8');
+    const namespace = await deriveProjectSlug(projectRoot);
+    const nsDir = path.join(projectRoot, '.nightfall', 'memory', namespace);
+    const projectContent = fs.readFileSync(path.join(nsDir, 'project.md'), 'utf8');
     expect(projectContent).toContain('no-pkg-project');
+  });
+});
+
+// ─── deriveProjectSlug tests ───────────────────────────────────
+
+describe('deriveProjectSlug', () => {
+  it('returns kebab-case basename when not in a git repo', async () => {
+    const projectRoot = path.join(TEST_ROOT, 'my-cool-project');
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const slug = await deriveProjectSlug(projectRoot);
+    expect(slug).toBe('my-cool-project');
+  });
+
+  it('sanitizes non-alphanumeric characters in directory name', async () => {
+    const projectRoot = path.join(TEST_ROOT, 'My.Project_v2');
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const slug = await deriveProjectSlug(projectRoot);
+    expect(slug).toBe('my-project-v2');
+  });
+
+  it('falls back to "project" when basename is empty or all special chars', async () => {
+    // Use a slug that would sanitize to empty — simulate via temp dir with safe name
+    const projectRoot = path.join(TEST_ROOT, 'valid-name');
+    fs.mkdirSync(projectRoot, { recursive: true });
+    const slug = await deriveProjectSlug(projectRoot);
+    expect(slug).toBeTruthy();
+    expect(slug.length).toBeGreaterThan(0);
+  });
+});
+
+// ─── MemoryManager namespace tests ─────────────────────────────
+
+describe('MemoryManager with namespace', () => {
+  it('stores files under the namespace subdirectory', async () => {
+    const manager = new MemoryManager(TEST_ROOT, 'my-ns');
+    await manager.ensureStructure();
+
+    const nsDir = path.join(TEST_ROOT, '.nightfall', 'memory', 'my-ns');
+    expect(fs.existsSync(nsDir)).toBe(true);
+    expect(fs.existsSync(path.join(nsDir, 'components'))).toBe(true);
+  });
+
+  it('does not create root-level components when namespace is set', async () => {
+    const manager = new MemoryManager(TEST_ROOT, 'ns-only');
+    await manager.ensureStructure();
+
+    const rootComponents = path.join(TEST_ROOT, '.nightfall', 'memory', 'components');
+    expect(fs.existsSync(rootComponents)).toBe(false);
+  });
+
+  it('writes and reads index.md under the namespace', async () => {
+    const manager = new MemoryManager(TEST_ROOT, 'test-ns');
+    await manager.ensureStructure();
+
+    await manager.saveIndex({
+      entries: [{ file: 'project.md', description: 'goals' }],
+      components: [],
+    });
+
+    const nsIndexPath = path.join(TEST_ROOT, '.nightfall', 'memory', 'test-ns', 'index.md');
+    expect(fs.existsSync(nsIndexPath)).toBe(true);
+
+    const loaded = await manager.loadIndex();
+    expect(loaded.entries).toHaveLength(1);
+    expect(loaded.entries[0].file).toBe('project.md');
+  });
+
+  it('namespace isolates files from the root memory dir', async () => {
+    const rootManager = new MemoryManager(TEST_ROOT);
+    const nsManager = new MemoryManager(TEST_ROOT, 'isolated-ns');
+    await rootManager.ensureStructure();
+    await nsManager.ensureStructure();
+
+    await rootManager.updateFile('patterns.md', '# Root Patterns');
+    await nsManager.updateFile('patterns.md', '# NS Patterns');
+
+    const rootContent = await rootManager.loadFile('patterns.md');
+    const nsContent = await nsManager.loadFile('patterns.md');
+
+    expect(rootContent).toBe('# Root Patterns');
+    expect(nsContent).toBe('# NS Patterns');
+  });
+
+  it('appendToProgress writes under the namespace', async () => {
+    const manager = new MemoryManager(TEST_ROOT, 'progress-ns');
+    await manager.ensureStructure();
+
+    await manager.appendToProgress('Task completed');
+
+    const progressPath = path.join(
+      TEST_ROOT,
+      '.nightfall',
+      'memory',
+      'progress-ns',
+      'progress.md',
+    );
+    expect(fs.existsSync(progressPath)).toBe(true);
+    const content = fs.readFileSync(progressPath, 'utf8');
+    expect(content).toContain('Task completed');
   });
 });

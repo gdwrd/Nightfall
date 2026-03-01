@@ -1,6 +1,9 @@
 import type { AgentState } from './agent.types.js';
 import type { TaskRun, TaskPlan, TaskStatus } from './task.types.js';
 import type { FileLock } from './lock.types.js';
+import type { TokenUsage } from './provider.types.js';
+
+export type { TokenUsage };
 
 // ---- Provider lifecycle events (emitted over WS) ----
 
@@ -11,6 +14,8 @@ export type ProviderLifecycleEvent =
   | { type: 'checking_model'; model: string }
   | { type: 'model_ready'; model: string; contextLength?: number }
   | { type: 'fatal'; message: string }
+  | { type: 'provider_check' }
+  | { type: 'provider_error'; error: string }
   // Ollama-specific events
   | { type: 'starting' }
   | { type: 'pulling_model'; model: string; progress: number }
@@ -38,6 +43,6 @@ export type ServerMessage =
   | { type: 'PLAN_READY'; payload: TaskPlan }
   | { type: 'AGENT_UPDATE'; payload: AgentState }
   | { type: 'LOCK_UPDATE'; payload: FileLock[] }
-  | { type: 'TASK_COMPLETE'; payload: { status: TaskStatus; summary: string } }
+  | { type: 'TASK_COMPLETE'; payload: { status: TaskStatus; summary: string; warnings?: string[]; tokenUsage?: TokenUsage } }
   | { type: 'SLASH_RESULT'; payload: { command: string; output: string } }
   | { type: 'ERROR'; payload: { message: string } };

@@ -1,6 +1,6 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import type { ToolImpl, ToolResult, ToolContext } from '../tool.types.js';
+import type { ToolImpl, ToolResult, ToolContext, ParameterSchema } from '../tool.types.js';
 import { resolveAndValidatePath } from './path.utils.js';
 
 const MAX_FILES = 500;
@@ -17,7 +17,7 @@ async function collectFiles(
   let entries;
   try {
     entries = await fs.readdir(dir, { withFileTypes: true });
-  } catch {
+  } catch (_err) {
     return;
   }
 
@@ -83,7 +83,7 @@ export const listFilesTool: ToolImpl = {
           error: `"${dirParam}" is not a directory`,
         };
       }
-    } catch {
+    } catch (_err) {
       return {
         tool: 'list_files',
         success: false,
@@ -106,3 +106,7 @@ export const listFilesTool: ToolImpl = {
     };
   },
 };
+
+export const parameterSchema: ParameterSchema[] = Object.entries(listFilesTool.definition.parameters).map(
+  ([name, def]) => ({ name, ...def }),
+);

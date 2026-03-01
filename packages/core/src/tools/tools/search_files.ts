@@ -1,6 +1,6 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import type { ToolImpl, ToolResult, ToolContext } from '../tool.types.js';
+import type { ToolImpl, ToolResult, ToolContext, ParameterSchema } from '../tool.types.js';
 import { resolveAndValidatePath } from './path.utils.js';
 
 const MAX_RESULTS = 50;
@@ -19,7 +19,7 @@ async function searchDir(
   let entries;
   try {
     entries = await fs.readdir(dir, { withFileTypes: true });
-  } catch {
+  } catch (_err) {
     return;
   }
 
@@ -38,7 +38,7 @@ async function searchDir(
         const stat = await fs.stat(fullPath);
         if (stat.size > MAX_FILE_SIZE) continue;
         content = await fs.readFile(fullPath, 'utf-8');
-      } catch {
+      } catch (_err) {
         continue;
       }
 
@@ -112,7 +112,7 @@ export const searchFilesTool: ToolImpl = {
     let regex: RegExp;
     try {
       regex = new RegExp(pattern, 'g');
-    } catch {
+    } catch (_err) {
       const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       regex = new RegExp(escaped, 'g');
     }
@@ -132,3 +132,7 @@ export const searchFilesTool: ToolImpl = {
     };
   },
 };
+
+export const parameterSchema: ParameterSchema[] = Object.entries(searchFilesTool.definition.parameters).map(
+  ([name, def]) => ({ name, ...def }),
+);

@@ -1,5 +1,17 @@
 import type { NightfallConfig } from '@nightfall/shared';
 
+/**
+ * Per-model context window sizes (in tokens).
+ * Used when `NightfallConfig.context_window` is not explicitly set.
+ * Checked by substring match against the configured model name.
+ */
+export const MODEL_CONTEXT_DEFAULTS: Record<string, number> = {
+  'deepseek-r1:14b': 16_384,
+  'deepseek-r1:7b': 16_384,
+  'deepseek-r1:32b': 32_768,
+  'openrouter': 32_768,
+};
+
 export const DEFAULT_CONFIG: NightfallConfig = {
   provider: {
     name: 'ollama',

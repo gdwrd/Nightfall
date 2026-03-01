@@ -15,7 +15,7 @@ export async function agentsHandler(ctx: CommandDispatcherContext): Promise<stri
         overrides.add(entry.replace(/\.md$/, ''));
       }
     }
-  } catch {
+  } catch (_err) {
     // Directory doesn't exist — all defaults
   }
 

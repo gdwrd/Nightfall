@@ -47,7 +47,7 @@ export async function historyHandler(ctx: CommandDispatcherContext, args: string
     const manager = new SnapshotManager(ctx.projectRoot);
     const [runs, snapshots] = await Promise.all([logger.listLogs(), manager.listSnapshots()]);
     return JSON.stringify({ type: 'history_view', runs, snapshots });
-  } catch {
+  } catch (_err) {
     return 'Could not read task history.';
   }
 }

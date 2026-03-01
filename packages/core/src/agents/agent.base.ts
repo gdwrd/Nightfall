@@ -11,6 +11,7 @@ import type { ToolContext, ToolResult } from '../tools/tool.types.js';
 import { ToolRegistry } from '../tools/tool.registry.js';
 import { buildSystemPrompt } from './agent.prompts.js';
 import { parseToolCall, parseDone } from './agent.parser.js';
+import { estimateTokens } from './agent.utils.js';
 
 export interface AgentConfig {
   /** Unique agent identifier, e.g. "engineer-1". */
@@ -30,6 +31,8 @@ export interface AgentConfig {
    * Tokens are estimated at ~4 chars per token.
    */
   maxContextTokens?: number;
+  /** Optional memory namespace override. Passed to ToolContext so memory tools can respect config.memoryNamespace. */
+  memoryNamespace?: string;
 }
 
 export interface AgentRunOptions {
@@ -69,9 +72,9 @@ export interface BaseAgent {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Approximate token count: ~4 characters per token. */
-function estimateTokens(messages: ChatMessage[]): number {
-  return Math.ceil(messages.reduce((sum, m) => sum + m.content.length, 0) / 4);
+/** Estimate total token count across a message array. */
+function estimateMessagesTokens(messages: ChatMessage[]): number {
+  return messages.reduce((sum, m) => sum + estimateTokens(m.content), 0);
 }
 
 /**
@@ -82,7 +85,7 @@ function estimateTokens(messages: ChatMessage[]): number {
  * pairs remain to drop.
  */
 function compactMessages(messages: ChatMessage[], budget: number): void {
-  while (estimateTokens(messages) > budget && messages.length > 4) {
+  while (estimateMessagesTokens(messages) > budget && messages.length > 3) {
     // messages[0] = system, messages[1] = original task — always preserved.
     // messages[2] and messages[3] are the oldest assistant/user tool exchange.
     messages.splice(2, 2);
@@ -170,10 +173,11 @@ export class BaseAgent extends EventEmitter {
       // --- Context window management ---
       if (maxContextTokens) {
         compactMessages(messages, maxContextTokens);
-        if (estimateTokens(messages) > maxContextTokens) {
+        const currentTokens = estimateMessagesTokens(messages);
+        if (currentTokens > maxContextTokens) {
           process.stderr.write(
             `[nightfall] agent ${this.config.id}: context overflow — ` +
-            `~${estimateTokens(messages)} tokens exceeds budget ${maxContextTokens}; ` +
+            `~${currentTokens} tokens exceeds budget ${maxContextTokens}; ` +
             `no messages left to compact (${messages.length} total).\n`,
           );
         }
@@ -223,6 +227,7 @@ export class BaseAgent extends EventEmitter {
           agentId: this.config.id,
           role: this.config.role,
           projectRoot: this.config.projectRoot,
+          memoryNamespace: this.config.memoryNamespace,
         };
 
         let result: ToolResult;

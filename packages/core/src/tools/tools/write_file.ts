@@ -1,6 +1,6 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import type { ToolImpl, ToolResult, ToolContext } from '../tool.types.js';
+import type { ToolImpl, ToolResult, ToolContext, ParameterSchema } from '../tool.types.js';
 import { resolveAndValidatePath } from './path.utils.js';
 
 export const writeFileTool: ToolImpl = {
@@ -66,3 +66,7 @@ export const writeFileTool: ToolImpl = {
     }
   },
 };
+
+export const parameterSchema: ParameterSchema[] = Object.entries(writeFileTool.definition.parameters).map(
+  ([name, def]) => ({ name, ...def }),
+);

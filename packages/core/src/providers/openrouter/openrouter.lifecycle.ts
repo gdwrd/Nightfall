@@ -6,7 +6,7 @@ const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1';
 
 /**
  * OpenRouter lifecycle: validate API key → test connectivity.
- * Emits structured events for the UI to display. Exits process on fatal error.
+ * Emits structured events for the UI to display. Throws on fatal error.
  */
 export async function ensureOpenRouter(
   config: NightfallConfig,
@@ -17,11 +17,9 @@ export async function ensureOpenRouter(
   // --- Validate API key exists ---
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
-    onEvent({
-      type: 'fatal',
-      message: 'OPENROUTER_API_KEY environment variable is not set.',
-    });
-    process.exit(1);
+    const msg = 'OPENROUTER_API_KEY environment variable is not set.';
+    onEvent({ type: 'fatal', message: msg });
+    throw new Error(msg);
   }
 
   onEvent({ type: 'validating_api_key' });
@@ -30,26 +28,29 @@ export async function ensureOpenRouter(
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
-    const response = await fetch(`${OPENROUTER_API_URL}/models`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
+    let response: Response;
+    try {
+      response = await fetch(`${OPENROUTER_API_URL}/models`, {
+        headers: { Authorization: `Bearer ${apiKey}` },
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
 
     if (!response.ok) {
-      onEvent({
-        type: 'fatal',
-        message: `OpenRouter API returned HTTP ${response.status}. Check your API key.`,
-      });
-      process.exit(1);
+      const msg = `OpenRouter API returned HTTP ${response.status}. Check your API key.`;
+      onEvent({ type: 'fatal', message: msg });
+      throw new Error(msg);
     }
   } catch (err) {
+    if (err instanceof Error && err.message.startsWith('OpenRouter API returned')) {
+      throw err;
+    }
     const message = err instanceof Error ? err.message : String(err);
-    onEvent({
-      type: 'fatal',
-      message: `Cannot reach OpenRouter API: ${message}`,
-    });
-    process.exit(1);
+    const msg = `Cannot reach OpenRouter API: ${message}`;
+    onEvent({ type: 'fatal', message: msg });
+    throw new Error(msg);
   }
 
   onEvent({ type: 'api_key_valid' });
