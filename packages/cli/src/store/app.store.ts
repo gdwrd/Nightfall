@@ -107,6 +107,9 @@ function reducer(state: AppState, action: AppAction): AppState {
     }
 
     case 'TASK_STATUS': {
+      // Don't let stale task:status events override new_project phase
+      if (state.phase === 'new_project') return state;
+
       const run = action.run;
       const messages = [...state.messages];
       let phase: AppPhase = state.phase;

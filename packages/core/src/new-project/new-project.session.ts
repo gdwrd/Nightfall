@@ -87,4 +87,9 @@ export class NewProjectSessionManager {
   hasActive(): boolean {
     return this.sessions.size > 0;
   }
+
+  /** Return any active session (first in the map), or undefined if none. */
+  getAnyActive(): NewProjectSession | undefined {
+    return this.sessions.values().next().value;
+  }
 }

@@ -58,7 +58,7 @@ function handleStart(
 
   if (sessionManager.hasActive()) {
     throw new HandlerError(
-      'A wizard session is already in progress. Type /cancel to start over.',
+      'A wizard session is already in progress. Run /new-project cancel to start over.',
     );
   }
 
@@ -163,17 +163,28 @@ async function handleGenerateSpec(
     conversationText,
   );
 
-  const spec = await collectResponse(provider, [
-    { role: 'system', content: systemPrompt },
-    { role: 'user', content: 'Generate the specification now.' },
-  ]);
+  let spec: string;
+  try {
+    spec = await collectResponse(provider, [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: 'Generate the specification now.' },
+    ]);
+  } catch (err) {
+    sessionManager.delete(session.id);
+    throw err;
+  }
 
   // Save spec to spec/ folder
   const slug = session.projectSlug || deriveSlug(session.idea);
   const specDir = path.join(ctx.projectRoot, 'spec');
   await fs.mkdir(specDir, { recursive: true });
   const specPath = path.join(specDir, `${slug}.md`);
-  await fs.writeFile(specPath, spec, 'utf-8');
+  try {
+    await fs.writeFile(specPath, spec, 'utf-8');
+  } catch (err) {
+    sessionManager.delete(session.id);
+    throw err;
+  }
 
   session.specPath = specPath;
   session.status = 'spec_saved';
@@ -196,19 +207,36 @@ async function handleGeneratePlan(
     throw new HandlerError('No spec has been generated yet. Generate the spec first.');
   }
 
-  const specContent = await fs.readFile(session.specPath, 'utf-8');
+  let specContent: string;
+  try {
+    specContent = await fs.readFile(session.specPath, 'utf-8');
+  } catch (err) {
+    sessionManager.delete(session.id);
+    throw err;
+  }
   const systemPrompt = DEV_PLAN_PROMPT.replace('{specification}', specContent);
 
-  const plan = await collectResponse(provider, [
-    { role: 'system', content: systemPrompt },
-    { role: 'user', content: 'Generate the development plan now.' },
-  ]);
+  let plan: string;
+  try {
+    plan = await collectResponse(provider, [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: 'Generate the development plan now.' },
+    ]);
+  } catch (err) {
+    sessionManager.delete(session.id);
+    throw err;
+  }
 
   // Save plan alongside the spec
   const slug = session.projectSlug || deriveSlug(session.idea);
   const specDir = path.dirname(session.specPath);
   const planPath = path.join(specDir, `${slug}-plan.md`);
-  await fs.writeFile(planPath, plan, 'utf-8');
+  try {
+    await fs.writeFile(planPath, plan, 'utf-8');
+  } catch (err) {
+    sessionManager.delete(session.id);
+    throw err;
+  }
 
   session.planPath = planPath;
   session.status = 'plan_saved';
@@ -227,16 +255,21 @@ async function handleGeneratePlan(
 }
 
 function handleCancel(sessionId: string): string {
-  const session = sessionManager.get(sessionId);
+  // Support cancelling without a session ID — cancel any active session
+  let session = sessionManager.get(sessionId);
+  if (!session && !sessionId) {
+    session = sessionManager.getAnyActive();
+  }
   const specPath = session?.specPath ?? null;
+  const resolvedId = session?.id ?? sessionId;
 
   if (session) {
-    sessionManager.delete(sessionId);
+    sessionManager.delete(session.id);
   }
 
   return JSON.stringify({
     type: 'new_project_done',
-    sessionId,
+    sessionId: resolvedId,
     specPath,
   });
 }
@@ -288,7 +321,7 @@ export async function newProjectHandler(
       if (sessionManager.hasActive()) {
         return JSON.stringify({
           type: 'new_project_error',
-          message: 'A wizard session is already in progress. Type /cancel to start over.',
+          message: 'A wizard session is already in progress. Run /new-project cancel to start over.',
         });
       }
       return JSON.stringify({
@@ -363,9 +396,9 @@ export async function newProjectHandler(
       return await handleGeneratePlan(ctx, sessionId);
     }
 
-    // /new-project cancel <sessionId>
-    if (trimmed.startsWith('cancel ')) {
-      const sessionId = trimmed.slice('cancel '.length).trim();
+    // /new-project cancel [sessionId]
+    if (trimmed === 'cancel' || trimmed.startsWith('cancel ')) {
+      const sessionId = trimmed === 'cancel' ? '' : trimmed.slice('cancel '.length).trim();
       return handleCancel(sessionId);
     }
 
