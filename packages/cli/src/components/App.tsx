@@ -491,7 +491,7 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
     }
 
     // Submit new task
-    if (phase === 'idle' || phase === 'completed' || phase === 'awaiting_approval') {
+    if (phase === 'idle' || phase === 'completed' || phase === 'answered' || phase === 'awaiting_approval') {
       dispatch({ type: 'RESET_TASK' });
       const ac = new AbortController();
       abortControllerRef.current = ac;
@@ -512,7 +512,7 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
       ? 'new_project_plan'
       : phase === 'new_project'
         ? 'new_project'
-        : phase === 'running' || phase === 'planning' || phase === 'editing_plan'
+        : phase === 'running' || phase === 'planning' || phase === 'editing_plan' || phase === 'classifying'
           ? 'running'
           : phase === 'awaiting_approval'
             ? 'plan_approval'

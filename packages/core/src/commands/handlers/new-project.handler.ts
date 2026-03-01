@@ -146,6 +146,10 @@ function handleDone(sessionId: string): string {
     throw new HandlerError('Session expired or not found. Start over with /new-project.');
   }
 
+  if (session.status !== 'gathering') {
+    throw new HandlerError('Q&A has already ended for this session.');
+  }
+
   const hasUserAnswers = session.history.some((h) => h.role === 'user');
   if (!hasUserAnswers) {
     throw new HandlerError('Cannot finish Q&A — no answers have been provided yet.');
@@ -179,28 +183,19 @@ async function handleGenerateSpec(
     () => conversationText,
   );
 
-  let spec: string;
-  try {
-    spec = await collectResponse(provider, [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: 'Generate the specification now.' },
-    ]);
-  } catch (err) {
-    sessionManager.delete(session.id);
-    throw err;
-  }
+  // Session is intentionally NOT deleted on errors here — accumulated Q&A
+  // history must survive transient LLM/IO failures so the user can retry.
+  const spec = await collectResponse(provider, [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: 'Generate the specification now.' },
+  ]);
 
   // Save spec to spec/ folder
   const slug = session.projectSlug || deriveSlug(session.idea);
   const specDir = path.join(ctx.projectRoot, 'spec');
   await fs.mkdir(specDir, { recursive: true });
   const specPath = path.join(specDir, `${slug}.md`);
-  try {
-    await fs.writeFile(specPath, spec, 'utf-8');
-  } catch (err) {
-    sessionManager.delete(session.id);
-    throw err;
-  }
+  await fs.writeFile(specPath, spec, 'utf-8');
 
   session.specPath = specPath;
   session.status = 'spec_saved';
@@ -219,41 +214,25 @@ async function handleGeneratePlan(
   const session = getSessionOrThrow(sessionId);
   const provider = ctx.provider;
 
-  if (!session.specPath) {
+  if (session.status !== 'spec_saved' || !session.specPath) {
     throw new HandlerError('No spec has been generated yet. Generate the spec first.');
   }
 
-  let specContent: string;
-  try {
-    specContent = await fs.readFile(session.specPath, 'utf-8');
-  } catch (err) {
-    sessionManager.delete(session.id);
-    throw err;
-  }
+  // Session is intentionally NOT deleted on errors — the user can retry.
+  const specContent = await fs.readFile(session.specPath, 'utf-8');
   // Use a function replacer to avoid $-pattern interpretation in spec content.
   const systemPrompt = DEV_PLAN_PROMPT.replace('{specification}', () => specContent);
 
-  let plan: string;
-  try {
-    plan = await collectResponse(provider, [
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: 'Generate the development plan now.' },
-    ]);
-  } catch (err) {
-    sessionManager.delete(session.id);
-    throw err;
-  }
+  const plan = await collectResponse(provider, [
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: 'Generate the development plan now.' },
+  ]);
 
   // Save plan alongside the spec
   const slug = session.projectSlug || deriveSlug(session.idea);
   const specDir = path.dirname(session.specPath);
   const planPath = path.join(specDir, `${slug}-plan.md`);
-  try {
-    await fs.writeFile(planPath, plan, 'utf-8');
-  } catch (err) {
-    sessionManager.delete(session.id);
-    throw err;
-  }
+  await fs.writeFile(planPath, plan, 'utf-8');
 
   session.planPath = planPath;
   session.status = 'plan_saved';
