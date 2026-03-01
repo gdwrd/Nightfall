@@ -3,6 +3,7 @@ import { EventEmitter } from 'node:events';
 import type {
   NightfallConfig,
   ProviderAdapter,
+  ProviderConfig,
   ClientMessage,
   ProviderLifecycleEvent,
 } from '@nightfall/shared';
@@ -10,6 +11,7 @@ import { TaskOrchestrator } from '../orchestrator/task.orchestrator.js';
 import { ensureOllama } from '../ollama/ollama.lifecycle.js';
 import { ensureOpenRouter } from '../providers/openrouter/openrouter.lifecycle.js';
 import { checkAnthropicKey } from '../providers/anthropic/anthropic.lifecycle.js';
+import { createProvider } from '../providers/provider.factory.js';
 import { WsBroadcaster } from './ws.broadcaster.js';
 import type { PendingApprovalHandle } from './ws.broadcaster.js';
 import { CommandDispatcher } from '../commands/command.dispatcher.js';
@@ -50,7 +52,7 @@ export class NightfallServer extends EventEmitter {
   private readonly wss: WebSocketServer;
   private readonly orchestrator: TaskOrchestrator;
   private readonly broadcaster: WsBroadcaster;
-  private readonly config: NightfallConfig;
+  private config: NightfallConfig;
 
   private readonly dispatcher: CommandDispatcher;
 
@@ -93,11 +95,22 @@ export class NightfallServer extends EventEmitter {
    * Start the server:
    * 1. Wire orchestrator events → WS broadcasts
    * 2. Begin accepting WS connections
-   * 3. Start provider lifecycle (broadcasts LIFECYCLE messages)
+   *
+   * NOTE: Does NOT start the provider lifecycle. Call startLifecycle() after
+   * the first client has connected so lifecycle events are not lost.
    */
   start(): void {
     this.approval = this.broadcaster.wireOrchestrator(this.orchestrator);
     this.wss.on('connection', (ws) => this.handleConnection(ws));
+  }
+
+  /**
+   * Start provider lifecycle checks and broadcast LIFECYCLE events to clients.
+   * Must be called after at least one client is connected, otherwise early
+   * synchronous events (detecting, fatal) will be broadcast to nobody and the
+   * UI will stall on "Detecting provider...".
+   */
+  startLifecycle(): void {
     this.startProviderLifecycle();
   }
 
@@ -217,6 +230,18 @@ export class NightfallServer extends EventEmitter {
         });
         break;
       }
+
+      case 'RECONFIGURE': {
+        this.handleReconfigure(msg.payload.provider);
+        break;
+      }
     }
+  }
+
+  private handleReconfigure(providerConfig: ProviderConfig): void {
+    this.config = { ...this.config, provider: providerConfig };
+    const newProvider = createProvider(this.config);
+    this.orchestrator.setProvider(newProvider);
+    this.startProviderLifecycle();
   }
 }

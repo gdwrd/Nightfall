@@ -37,4 +37,5 @@ export type AppAction =
   | { type: 'APPEND_NEW_PROJECT_HISTORY'; entry: { role: 'user' | 'assistant'; content: string } }
   | { type: 'CLEAR_NEW_PROJECT' }
   | { type: 'HISTORY_CLEARED' }
-  | { type: 'PLAN_EDIT_FAILED'; message: string };
+  | { type: 'PLAN_EDIT_FAILED'; message: string }
+  | { type: 'SET_PROVIDER_SETUP'; errorMessage: string };

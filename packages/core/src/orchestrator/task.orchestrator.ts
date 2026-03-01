@@ -131,6 +131,11 @@ export class TaskOrchestrator extends EventEmitter {
     return this.lockRegistry.getLocks();
   }
 
+  /** Replace the active provider adapter (used by the provider setup wizard on reconfigure). */
+  setProvider(provider: ProviderAdapter): void {
+    this.options.provider = provider;
+  }
+
   /**
    * Clear all in-memory task run state.
    *

@@ -4,6 +4,7 @@ import type {
   ClientMessage,
   ServerMessage,
   ProviderLifecycleEvent,
+  ProviderConfig,
   TaskRun,
   TaskPlan,
   AgentState,
@@ -42,6 +43,7 @@ export interface IOrchestrator extends EventEmitter {
   approvePlan(taskId: string, signal?: AbortSignal, editedPlan?: TaskPlan): Promise<TaskRun>;
   getLocks(): FileLock[];
   sendSlashCommand(command: string, args: string): void;
+  reconfigure(providerConfig: ProviderConfig): void;
 }
 
 // ---------------------------------------------------------------------------
@@ -264,6 +266,11 @@ export class NightfallWsClient extends EventEmitter implements IOrchestrator {
   /** Send a slash command to the server for server-side processing. */
   sendSlashCommand(command: string, args: string): void {
     this.send({ type: 'SLASH_COMMAND', payload: { command, args } });
+  }
+
+  /** Send a RECONFIGURE message to the server to switch provider at runtime. */
+  reconfigure(providerConfig: ProviderConfig): void {
+    this.send({ type: 'RECONFIGURE', payload: { provider: providerConfig } });
   }
 
   // ---------------------------------------------------------------------------

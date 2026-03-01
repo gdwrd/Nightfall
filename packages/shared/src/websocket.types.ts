@@ -2,6 +2,7 @@ import type { AgentState } from './agent.types.js';
 import type { TaskRun, TaskPlan, TaskStatus } from './task.types.js';
 import type { FileLock } from './lock.types.js';
 import type { TokenUsage } from './provider.types.js';
+import type { ProviderConfig } from './config.types.js';
 
 export type { TokenUsage };
 
@@ -33,7 +34,8 @@ export type ClientMessage =
   | { type: 'APPROVE_PLAN'; payload: { editedPlan?: TaskPlan } }
   | { type: 'REJECT_PLAN'; payload: Record<string, never> }
   | { type: 'INTERRUPT'; payload: Record<string, never> }
-  | { type: 'SLASH_COMMAND'; payload: { command: string; args: string } };
+  | { type: 'SLASH_COMMAND'; payload: { command: string; args: string } }
+  | { type: 'RECONFIGURE'; payload: { provider: ProviderConfig } };
 
 // ---- Server → Client messages ----
 

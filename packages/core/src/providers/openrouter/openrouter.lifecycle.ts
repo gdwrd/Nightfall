@@ -15,7 +15,9 @@ export async function ensureOpenRouter(
   onEvent({ type: 'detecting' });
 
   // --- Validate API key exists ---
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey =
+    (config.provider.name === 'openrouter' ? config.provider.api_key : undefined) ??
+    process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     const msg = 'OPENROUTER_API_KEY environment variable is not set.';
     onEvent({ type: 'fatal', message: msg });

@@ -97,14 +97,14 @@ describe('LIFECYCLE_EVENT', () => {
     expect(next.contextLength).toBe(16384);
   });
 
-  it('transitions phase to error on fatal', () => {
+  it('transitions phase to provider_setup on fatal', () => {
     const state = makeInitialState();
     const next = apply(state, {
       type: 'LIFECYCLE_EVENT',
       event: { type: 'fatal', message: 'Provider failed' },
     });
-    expect(next.phase).toBe('error');
-    expect(next.errorMessage).toBe('Provider failed');
+    expect(next.phase).toBe('provider_setup');
+    expect(next.providerSetupError).toBe('Provider failed');
   });
 
   it('does not change phase for provider_check event', () => {
