@@ -45,11 +45,15 @@ describe('config.loader', () => {
     const { loadConfig } = await import('./config.loader.js');
     const { DEFAULT_CONFIG } = await import('./config.defaults.js');
     fs.mkdirSync(NIGHTFALL_DIR, { recursive: true });
+    // Provider must be a full stanza — partial provider objects are not
+    // deep-merged to avoid field bleed between provider types.
     fs.writeFileSync(
       CONFIG_PATH,
       `
 provider:
+  name: ollama
   model: llama3:8b
+  host: localhost
   port: 11435
 concurrency:
   max_engineers: 5
@@ -57,11 +61,10 @@ concurrency:
     );
 
     const config = await loadConfig();
-    expect(config.provider.name).toBe(DEFAULT_CONFIG.provider.name);
+    expect(config.provider.name).toBe('ollama');
     expect(config.provider.model).toBe('llama3:8b');
 
     // Narrow to OllamaProviderConfig for Ollama-specific fields
-    expect(config.provider.name).toBe('ollama');
     const provider = config.provider as OllamaProviderConfig;
     const defaultProvider = DEFAULT_CONFIG.provider as OllamaProviderConfig;
     expect(provider.port).toBe(11435);
@@ -85,7 +88,10 @@ concurrency:
   it('throws on invalid port in config file', async () => {
     const { loadConfig } = await import('./config.loader.js');
     fs.mkdirSync(NIGHTFALL_DIR, { recursive: true });
-    fs.writeFileSync(CONFIG_PATH, `provider:\n  port: 99999\n`);
+    fs.writeFileSync(
+      CONFIG_PATH,
+      `provider:\n  name: ollama\n  model: deepseek-r1:14b\n  host: localhost\n  port: 99999\n`,
+    );
     await expect(loadConfig()).rejects.toThrow('provider.port');
   });
 
@@ -109,7 +115,7 @@ provider:
   it('throws on unknown provider name', async () => {
     const { loadConfig } = await import('./config.loader.js');
     fs.mkdirSync(NIGHTFALL_DIR, { recursive: true });
-    fs.writeFileSync(CONFIG_PATH, `provider:\n  name: unknown_provider\n`);
+    fs.writeFileSync(CONFIG_PATH, `provider:\n  name: unknown_provider\n  model: some-model\n`);
     await expect(loadConfig()).rejects.toThrow('unknown provider');
   });
 });

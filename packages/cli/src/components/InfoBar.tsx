@@ -1,11 +1,17 @@
 import React from 'react';
 import { Box, Text } from 'ink';
+import type { ProviderConfig } from '@nightfall/shared';
 import { THEME } from '../theme.js';
 
 interface InfoBarProps {
-  provider: { name: string; host: string; port: number };
+  provider: ProviderConfig;
   memoryInitialized: boolean;
   contextLength: number | null;
+}
+
+function formatProvider(p: ProviderConfig): string {
+  if (p.name === 'ollama') return `ollama@${p.host}:${p.port}`;
+  return p.name;
 }
 
 export const InfoBar: React.FC<InfoBarProps> = ({ provider, memoryInitialized, contextLength }) => {
@@ -16,9 +22,7 @@ export const InfoBar: React.FC<InfoBarProps> = ({ provider, memoryInitialized, c
 
   return (
     <Box borderStyle="single" borderColor={THEME.dimBorder} paddingX={1} gap={2}>
-      <Text color={THEME.dim}>
-        {provider.name}@{provider.host}:{provider.port}
-      </Text>
+      <Text color={THEME.dim}>{formatProvider(provider)}</Text>
       <Text color={memColor}>
         {memSymbol} {memLabel}
       </Text>

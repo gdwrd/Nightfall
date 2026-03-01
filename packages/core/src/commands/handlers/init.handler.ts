@@ -1,10 +1,13 @@
-import { initializeMemoryBank, previewMemoryBank } from '../../memory/memory.init.js';
+import {
+  initializeMemoryBankWithLLM,
+  previewMemoryBank,
+} from '../../memory/memory.init.js';
 import type { CommandDispatcherContext } from '../command.dispatcher.js';
 
 export async function initHandler(ctx: CommandDispatcherContext, args: string): Promise<string> {
   try {
     if (args.trim() === 'confirm') {
-      const result = await initializeMemoryBank(ctx.projectRoot);
+      const result = await initializeMemoryBankWithLLM(ctx.projectRoot, ctx.provider);
       const fileList = result.filesCreated.map((f) => `  ${f}`).join('\n');
       return `✓ Memory bank initialized in .nightfall/memory/\n${fileList}`;
     }
