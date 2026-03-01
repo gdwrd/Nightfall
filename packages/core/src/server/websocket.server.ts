@@ -80,6 +80,7 @@ export class NightfallServer extends EventEmitter {
       config: options.config,
       projectRoot: options.projectRoot,
       orchestrator: this.orchestrator,
+      provider: options.provider,
     });
   }
 

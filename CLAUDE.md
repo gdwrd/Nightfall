@@ -55,13 +55,14 @@ The core runs as a standalone WebSocket server; the CLI is a pure WS client. Thi
 - **`server/`** — `NightfallServer` wraps the orchestrator behind a WebSocket interface. Handles 5 `ClientMessage` types: `SUBMIT_TASK`, `APPROVE_PLAN`, `REJECT_PLAN`, `INTERRUPT`, `SLASH_COMMAND`.
 - **`providers/`** — `ProviderAdapter` interface with Ollama and OpenRouter implementations. `provider.factory.ts` selects the adapter from config.
 - **`tools/`** — `ToolRegistry` enforces per-role tool access. Role permissions: `team-lead` → read/assign/review, `engineer` → read/write_diff/run_command, `reviewer` → read/run_command, `memory-manager` → read/write_memory/update_index.
-- **`commands/handlers/`** — 9 slash command handlers (`/init`, `/help`, `/status`, `/history`, `/memory`, `/config`, `/agents`, `/clear`, `/compact`).
+- **`commands/handlers/`** — 12 slash command handlers (`/init`, `/help`, `/status`, `/history`, `/memory`, `/config`, `/agents`, `/clear`, `/compact`, `/model`, `/settings`, `/new-project`).
+- **`new-project/`** — `NewProjectSessionManager` holds in-memory wizard sessions, `deriveSlug` generates kebab-case file names, and system prompts drive the iterative Q&A, spec compilation, and plan generation LLM interactions.
 - **`locks/`**, **`snapshots/`**, **`memory/`** — file lock registry (deadlock detection), pre-task snapshots with cascade-aware rollback, memory bank R/W.
 
 ### CLI internals (`packages/cli/src/`)
 
 - **`ws.client.ts`** — `NightfallWsClient` implements `IOrchestrator`, translating WS messages to EventEmitter events. `App.tsx` and slash commands depend only on the `IOrchestrator` interface, not the concrete client.
-- **`components/`** — ink (React for terminal) UI: `App.tsx` (root), `AgentGrid`/`AgentPanel` (live agent status), `InputBar` (task input + autocomplete), `HistoryView` (task history + rollback), `PlanReview` (approve/edit/reject plans), `ThinkingPanel` (fullscreen streaming output).
+- **`components/`** — ink (React for terminal) UI: `App.tsx` (root), `AgentGrid`/`AgentPanel` (live agent status), `InputBar` (task input + autocomplete), `HistoryView` (task history + rollback), `PlanReview` (approve/edit/reject plans), `ThinkingPanel` (fullscreen streaming output), `NewProjectWizard` (guided brainstorming wizard).
 - **`store/`** — `app.store.ts` + `app.actions.ts` for UI state management.
 
 ### Agent communication protocol

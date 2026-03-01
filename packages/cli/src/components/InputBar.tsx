@@ -8,7 +8,9 @@ export type InputMode =
   | 'plan_approval' // awaiting y/n/revised prompt
   | 'running' // task executing — show hint only
   | 'completed' // show completion, accept next task
-  | 'init_confirm'; // awaiting y/n for /init preview
+  | 'init_confirm' // awaiting y/n for /init preview
+  | 'new_project' // answering wizard questions
+  | 'new_project_plan'; // confirming plan generation (y/n)
 
 interface InputBarProps {
   mode: InputMode;
@@ -46,14 +48,20 @@ export const InputBar: React.FC<InputBarProps> = ({
       ? 'y to approve · n to cancel · or type a revised task'
       : mode === 'init_confirm'
         ? 'y to create · n to cancel'
-        : mode === 'completed'
-          ? completionMessage
-            ? completionMessage + ' — type next task or /help'
-            : 'Task complete — type next task or /help'
-          : 'Type a task or /help…';
+        : mode === 'new_project'
+          ? 'Type your answer or /done to finish Q&A'
+          : mode === 'new_project_plan'
+            ? 'y to generate plan · n to skip'
+            : mode === 'completed'
+              ? completionMessage
+                ? completionMessage + ' — type next task or /help'
+                : 'Task complete — type next task or /help'
+              : 'Type a task or /help…';
 
   const promptColor =
-    mode === 'plan_approval' || mode === 'init_confirm' ? THEME.warning : THEME.accent;
+    mode === 'plan_approval' || mode === 'init_confirm' || mode === 'new_project_plan'
+      ? THEME.warning
+      : THEME.accent;
 
   return (
     <Box borderStyle="single" borderColor={THEME.accent} paddingX={1}>

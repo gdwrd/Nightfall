@@ -20,6 +20,7 @@ import { RollbackConfirm } from './RollbackConfirm.js';
 import { ThinkingPanel } from './ThinkingPanel.js';
 import { ModelView } from './ModelView.js';
 import { SettingsView } from './SettingsView.js';
+import { NewProjectWizard } from './NewProjectWizard.js';
 import { useAppStore } from '../store/app.store.js';
 import type { ModelViewData } from '../store/app.store.js';
 
@@ -203,6 +204,105 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
         }
       }
 
+      if (payload.command === '/new-project') {
+        try {
+          const data = JSON.parse(payload.output) as { type: string; [key: string]: unknown };
+
+          switch (data.type) {
+            case 'new_project_ask_idea':
+              dispatch({
+                type: 'SET_NEW_PROJECT',
+                data: {
+                  sessionId: '', // No session yet — will be set when start responds
+                  status: 'asking_idea',
+                  currentQuestion: 'What would you like to build? Describe your idea in a few sentences.',
+                  questionNumber: 0,
+                  history: [],
+                },
+              });
+              return;
+
+            case 'new_project_question':
+              // Natural language trigger: `idea` field is present — set up
+              // fresh wizard state including the user's original prompt.
+              if (data.idea) {
+                dispatch({
+                  type: 'SET_NEW_PROJECT',
+                  data: {
+                    sessionId: data.sessionId as string,
+                    status: 'gathering',
+                    currentQuestion: data.question as string,
+                    questionNumber: data.questionNumber as number,
+                    history: [
+                      { role: 'assistant' as const, content: 'What would you like to build? Describe your idea.' },
+                      { role: 'user' as const, content: data.idea as string },
+                    ],
+                  },
+                });
+                dispatch({
+                  type: 'APPEND_NEW_PROJECT_HISTORY',
+                  entry: { role: 'assistant' as const, content: data.question as string },
+                });
+              } else {
+                dispatch({
+                  type: 'UPDATE_NEW_PROJECT',
+                  partial: {
+                    sessionId: data.sessionId as string,
+                    status: 'gathering',
+                    currentQuestion: data.question as string,
+                    questionNumber: data.questionNumber as number,
+                  },
+                });
+                dispatch({
+                  type: 'APPEND_NEW_PROJECT_HISTORY',
+                  entry: { role: 'assistant' as const, content: data.question as string },
+                });
+              }
+              return;
+
+            case 'new_project_gathering_complete':
+              dispatch({
+                type: 'UPDATE_NEW_PROJECT',
+                partial: { status: 'compiling_spec', currentQuestion: null },
+              });
+              orchestrator.sendSlashCommand('/new-project', `generate-spec ${data.sessionId as string}`);
+              return;
+
+            case 'new_project_spec_saved':
+              dispatch({
+                type: 'UPDATE_NEW_PROJECT',
+                partial: { status: 'asking_plan' },
+              });
+              return;
+
+            case 'new_project_plan_saved':
+              dispatch({ type: 'CLEAR_NEW_PROJECT' });
+              dispatch({
+                type: 'SET_SLASH_OUTPUT',
+                output: `✓ Project spec and plan saved!\n  Spec: ${data.specPath as string}\n  Plan: ${data.planPath as string}`,
+              });
+              return;
+
+            case 'new_project_done':
+              dispatch({ type: 'CLEAR_NEW_PROJECT' });
+              dispatch({
+                type: 'SET_SLASH_OUTPUT',
+                output: (data.specPath as string | undefined)
+                  ? `✓ Project spec saved to ${data.specPath as string}`
+                  : 'New project wizard cancelled.',
+              });
+              return;
+
+            case 'new_project_error':
+              dispatch({ type: 'CLEAR_NEW_PROJECT' });
+              dispatch({ type: 'SET_SLASH_OUTPUT', output: `Error: ${data.message as string}` });
+              return;
+          }
+        } catch {
+          // Not JSON — fall through to plain text output
+        }
+      }
+
       dispatch({ type: 'SET_SLASH_OUTPUT', output: payload.output });
     };
     orchestrator.on('slash:result', onSlashResult);
@@ -216,6 +316,14 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
     if (key.ctrl && input === 'c') {
       if (phase === 'running' || phase === 'planning') {
         abortControllerRef.current?.abort();
+      } else if (phase === 'new_project') {
+        const sid = state.newProjectData?.sessionId;
+        // Always send cancel — use bare `cancel` when sessionId is unknown
+        // (e.g. during the race between sending `start` and receiving the
+        // response). The server's handleCancel supports bare cancel via
+        // getAnyActive().
+        orchestrator.sendSlashCommand('/new-project', sid ? `cancel ${sid}` : 'cancel');
+        dispatch({ type: 'CLEAR_NEW_PROJECT' });
       } else {
         exit();
       }
@@ -237,6 +345,69 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
         dispatch({ type: 'SET_SLASH_OUTPUT', output: 'Cancelled.' });
       }
       return;
+    }
+
+    // New project wizard mode
+    if (phase === 'new_project' && state.newProjectData) {
+      const { sessionId, status } = state.newProjectData;
+
+      if (input.toLowerCase() === '/cancel') {
+        orchestrator.sendSlashCommand('/new-project', `cancel ${sessionId}`);
+        return;
+      }
+
+      if (status === 'asking_idea') {
+        dispatch({
+          type: 'UPDATE_NEW_PROJECT',
+          partial: {
+            status: 'gathering',
+            history: [
+              { role: 'assistant' as const, content: state.newProjectData.currentQuestion! },
+              { role: 'user' as const, content: input },
+            ],
+          },
+        });
+        orchestrator.sendSlashCommand('/new-project', `start ${input}`);
+        return;
+      }
+
+      if (status === 'gathering') {
+        if (input.toLowerCase() === '/done') {
+          // Don't optimistically set status to 'compiling_spec' here — let the
+          // server response ('new_project_gathering_complete') drive the
+          // transition. Otherwise a server-side error (e.g. "no answers yet")
+          // causes a brief spinner flash before the error clears the wizard.
+          orchestrator.sendSlashCommand('/new-project', `done ${sessionId}`);
+          return;
+        }
+        dispatch({
+          type: 'UPDATE_NEW_PROJECT',
+          partial: {
+            history: [
+              ...state.newProjectData.history,
+              { role: 'user' as const, content: input },
+            ],
+          },
+        });
+        orchestrator.sendSlashCommand('/new-project', `answer ${sessionId} ${input}`);
+        return;
+      }
+
+      if (status === 'asking_plan') {
+        const lower = input.toLowerCase();
+        if (lower === 'y' || lower === 'yes') {
+          dispatch({
+            type: 'UPDATE_NEW_PROJECT',
+            partial: { status: 'compiling_plan' },
+          });
+          orchestrator.sendSlashCommand('/new-project', `generate-plan ${sessionId}`);
+        } else {
+          orchestrator.sendSlashCommand('/new-project', `cancel ${sessionId}`);
+        }
+        return;
+      }
+
+      return; // Swallow input during compiling states
     }
 
     // Slash commands
@@ -320,7 +491,7 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
     }
 
     // Submit new task
-    if (phase === 'idle' || phase === 'completed' || phase === 'awaiting_approval') {
+    if (phase === 'idle' || phase === 'completed' || phase === 'answered' || phase === 'awaiting_approval') {
       dispatch({ type: 'RESET_TASK' });
       const ac = new AbortController();
       abortControllerRef.current = ac;
@@ -337,13 +508,17 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
   // ── Derive InputBar mode ───────────────────────────────────────────────────
   const inputMode: InputMode = awaitingInitConfirm
     ? 'init_confirm'
-    : phase === 'running' || phase === 'planning' || phase === 'editing_plan'
-      ? 'running'
-      : phase === 'awaiting_approval'
-        ? 'plan_approval'
-        : phase === 'completed'
-          ? 'completed'
-          : 'idle';
+    : phase === 'new_project' && state.newProjectData?.status === 'asking_plan'
+      ? 'new_project_plan'
+      : phase === 'new_project'
+        ? 'new_project'
+        : phase === 'running' || phase === 'planning' || phase === 'editing_plan' || phase === 'classifying'
+          ? 'running'
+          : phase === 'awaiting_approval'
+            ? 'plan_approval'
+            : phase === 'completed'
+              ? 'completed'
+              : 'idle';
 
   // ── Determine engineer count for grid ─────────────────────────────────────
   const engineerCount = activeRun?.plan?.estimatedEngineers ?? 1;
@@ -443,6 +618,19 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
           dispatch({ type: 'SET_PHASE', phase: 'idle' });
           dispatch({ type: 'SET_SLASH_OUTPUT', output: null });
         }}
+      />
+    );
+  }
+
+  // New project wizard
+  if (phase === 'new_project' && state.newProjectData) {
+    return (
+      <NewProjectWizard
+        data={state.newProjectData}
+        onAnswer={(answer) => handleInput(answer)}
+        onDone={() => handleInput('/done')}
+        onCancel={() => handleInput('/cancel')}
+        onConfirmPlan={(yes) => handleInput(yes ? 'y' : 'n')}
       />
     );
   }

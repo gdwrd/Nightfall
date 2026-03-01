@@ -67,3 +67,16 @@ export type { PendingApprovalHandle } from './server/ws.broadcaster.js';
 // Phase 16 — Slash Commands
 export { CommandDispatcher } from './commands/command.dispatcher.js';
 export type { CommandDispatcherContext } from './commands/command.dispatcher.js';
+// New Project Wizard
+export {
+  NewProjectSessionManager,
+  deriveSlug,
+  MAX_QUESTIONS,
+  SPEC_BUILDER_SYSTEM_PROMPT,
+  SPEC_COMPILATION_PROMPT,
+  DEV_PLAN_PROMPT,
+} from './new-project/index.js';
+export type {
+  NewProjectSession,
+  SessionStatus,
+} from './new-project/index.js';

@@ -18,6 +18,7 @@ export const SLASH_COMMANDS: Record<string, string> = {
   '/compact': 'Compress conversation history (future feature)',
   '/model': 'Pick active model for current provider',
   '/settings': 'Edit all configuration settings',
+  '/new-project': 'Start a guided wizard to spec out a new project',
 };
 
 // ---------------------------------------------------------------------------

@@ -89,6 +89,10 @@ export class WsBroadcaster {
       this.broadcast({ type: 'LOCK_UPDATE', payload: locks });
     });
 
+    orchestrator.on('slash:result', (payload: { command: string; output: string }) => {
+      this.broadcast({ type: 'SLASH_RESULT', payload });
+    });
+
     return {
       getPendingTaskId: () => pendingApprovalTaskId,
       clearPendingTaskId: () => {

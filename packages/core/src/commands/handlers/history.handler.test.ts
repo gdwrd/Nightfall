@@ -17,6 +17,7 @@ beforeEach(async () => {
     config: {} as CommandDispatcherContext['config'],
     projectRoot: tmpDir,
     orchestrator: {} as CommandDispatcherContext['orchestrator'],
+    provider: {} as CommandDispatcherContext['provider'],
   };
 });
 

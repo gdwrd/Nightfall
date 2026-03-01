@@ -1,4 +1,4 @@
-import type { NightfallConfig } from '@nightfall/shared';
+import type { NightfallConfig, ProviderAdapter } from '@nightfall/shared';
 import type { TaskOrchestrator } from '../orchestrator/task.orchestrator.js';
 import { helpHandler } from './handlers/help.handler.js';
 import { initHandler } from './handlers/init.handler.js';
@@ -11,6 +11,7 @@ import { compactHandler } from './handlers/compact.handler.js';
 import { clearHandler } from './handlers/clear.handler.js';
 import { modelHandler } from './handlers/model.handler.js';
 import { settingsHandler } from './handlers/settings.handler.js';
+import { newProjectHandler } from './handlers/new-project.handler.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -20,6 +21,7 @@ export interface CommandDispatcherContext {
   config: NightfallConfig;
   projectRoot: string;
   orchestrator: TaskOrchestrator;
+  provider: ProviderAdapter;
 }
 
 // ---------------------------------------------------------------------------
@@ -67,6 +69,9 @@ export class CommandDispatcher {
 
       case '/settings':
         return settingsHandler(this.ctx, args);
+
+      case '/new-project':
+        return newProjectHandler(this.ctx, args);
 
       default:
         return `Unknown command: ${command}. Type /help for available commands.`;
