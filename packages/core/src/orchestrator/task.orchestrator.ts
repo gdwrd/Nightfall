@@ -28,6 +28,7 @@ import {
 } from './agent.factory.js';
 import { TaskLogger } from './task.logger.js';
 import type { BaseAgent } from '../agents/agent.base.js';
+import { newProjectHandler } from '../commands/handlers/new-project.handler.js';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -62,11 +63,14 @@ export interface TaskOrchestrator {
   on(event: 'agent:state', listener: (state: AgentState) => void): this;
   /** Emitted whenever the file lock set changes. */
   on(event: 'lock:update', listener: (locks: FileLock[]) => void): this;
+  /** Emitted when the orchestrator wants to inject a slash-command result (e.g. new_project routing). */
+  on(event: 'slash:result', listener: (payload: { command: string; output: string }) => void): this;
 
   emit(event: 'task:plan-ready', run: TaskRun): boolean;
   emit(event: 'task:status', run: TaskRun): boolean;
   emit(event: 'agent:state', state: AgentState): boolean;
   emit(event: 'lock:update', locks: FileLock[]): boolean;
+  emit(event: 'slash:result', payload: { command: string; output: string }): boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -163,6 +167,10 @@ export class TaskOrchestrator extends EventEmitter {
     // ── Phase 2: Route ──────────────────────────────────────────────────────
     if (requestType === 'question') {
       return this.runQuestionPath(run, factoryOptions, signal);
+    }
+
+    if (requestType === 'new_project') {
+      return this.routeToNewProject(run, prompt);
     }
 
     // coding_task — continue with Team Lead planning
@@ -541,10 +549,38 @@ export class TaskOrchestrator extends EventEmitter {
     return this.snapshot(run);
   }
 
-  private parseClassification(summary: string): 'coding_task' | 'question' {
+  // ---------------------------------------------------------------------------
+  // New project routing
+  // ---------------------------------------------------------------------------
+
+  private async routeToNewProject(run: TaskRun, prompt: string): Promise<TaskRun> {
+    const ctx = {
+      config: this.options.config,
+      projectRoot: this.options.projectRoot,
+      orchestrator: this,
+      provider: this.options.provider,
+    };
+
+    const output = await newProjectHandler(ctx, `start ${prompt}`);
+
+    // Emit as a slash:result so the CLI handles it identically to /new-project
+    this.emit('slash:result', { command: '/new-project', output });
+
+    // Mark the task run as completed — the wizard continues via slash commands
+    run.status = 'completed';
+    run.completedAt = Date.now();
+    this.activeRuns.set(run.id, run);
+    this.emit('task:status', this.snapshot(run));
+    await this.persistLog(run);
+
+    return this.snapshot(run);
+  }
+
+  private parseClassification(summary: string): 'coding_task' | 'question' | 'new_project' {
     try {
       const parsed = JSON.parse(summary) as Record<string, unknown>;
       if (parsed['type'] === 'question') return 'question';
+      if (parsed['type'] === 'new_project') return 'new_project';
     } catch {
       // Malformed — default to coding_task (safe fallback)
     }

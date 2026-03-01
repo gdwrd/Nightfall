@@ -697,10 +697,10 @@ export const SLASH_COMMANDS: Record<string, string> = {
 
 ### Task 6: Natural Language Trigger
 
-- [ ] Update classifier prompt in `agent.factory.ts` to detect `new_project` intent
-- [ ] Update `parseClassification()` and `submitTask()` in `task.orchestrator.ts` to route `new_project` intent
-- [ ] Implement `routeToNewProject` method on orchestrator
-- [ ] All tests and lint pass
+- [x] Update classifier prompt in `agent.factory.ts` to detect `new_project` intent
+- [x] Update `parseClassification()` and `submitTask()` in `task.orchestrator.ts` to route `new_project` intent
+- [x] Implement `routeToNewProject` method on orchestrator
+- [x] All tests and lint pass
 
 Allow users to start the new-project flow by simply typing something like "I want to build a task management app" without using `/new-project`.
 
