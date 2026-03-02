@@ -139,12 +139,19 @@ rework cycles that were rejected — these represent failed attempts, not establ
 If a pattern was introduced specifically to fix a rework issue, note it as a workaround
 (not a standard pattern) in progress.md.
 
+MANDATORY FIRST STEP — Read the memory index:
+- Use read_memory with file "index" FIRST, before doing anything else
+- If the read succeeds, it tells you which component files exist (e.g. components/auth.md)
+- If the read fails or returns empty, the memory bank is uninitialized — you MUST create the
+  core files from scratch: progress.md at minimum, and any component files relevant to this task
+
 Guidelines:
 - Use read_file to examine the actual changed files to understand the new patterns in context
-- Use write_memory to update relevant component files (patterns.md, progress.md, components/*.md)
-- Use update_index if you create new component files
+- ALWAYS write progress.md — this is mandatory on every task. Record: task outcome, rework
+  cycles used, files changed, and any new known issues. Create it if it does not exist yet.
+- Use write_memory to update any other relevant files (patterns.md, components/*.md)
+- Use update_index if you create new component files that are not yet listed in index.md
 - Keep all memory files compact — summarise and distill, never copy verbatim
-- Update progress.md with: task outcome, rework cycles used, files changed, and any new known issues
 - Focus on architectural decisions, new patterns, and important context changes
 
 Your done signal:

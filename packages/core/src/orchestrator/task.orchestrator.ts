@@ -33,6 +33,8 @@ import { TaskLogger } from './task.logger.js';
 import type { BaseAgent } from '../agents/agent.base.js';
 import { getModelContextWindow } from '../agents/agent.utils.js';
 import { newProjectHandler } from '../commands/handlers/new-project.handler.js';
+import { MemoryManager } from '../memory/memory.manager.js';
+import { deriveProjectSlug } from '../memory/memory.init.js';
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -539,8 +541,20 @@ export class TaskOrchestrator extends EventEmitter {
   ): Promise<TokenUsage | undefined> {
     if (!run.plan) return undefined;
 
+    // Resolve the namespace once so all tool calls use the same value.
+    const namespace =
+      factoryOptions.memoryNamespace ?? (await deriveProjectSlug(factoryOptions.projectRoot));
+
+    // Ensure directory structure exists before the agent runs (no-op if already initialized).
+    const memManager = new MemoryManager(factoryOptions.projectRoot, namespace);
+    await memManager.ensureStructure();
+
+    // Pass resolved namespace into agent context so read_memory/write_memory/update_index
+    // all target the same directory without independent git shell execs.
+    const resolvedOptions: AgentFactoryOptions = { ...factoryOptions, memoryNamespace: namespace };
+
     const toolRegistry = new ToolRegistry();
-    const memoryManager = createMemoryManagerAgent(factoryOptions, toolRegistry);
+    const memoryManager = createMemoryManagerAgent(resolvedOptions, toolRegistry);
     this.wireAgentEvents(memoryManager, run);
 
     const allFiles = [...new Set(run.plan.subtasks.flatMap((s) => s.filesTouched))];

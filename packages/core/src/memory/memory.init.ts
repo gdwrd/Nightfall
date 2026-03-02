@@ -62,7 +62,15 @@ export interface InitPreview {
   files: Array<{ path: string; description: string }>;
 }
 
-interface ProjectInfo {
+/** Cached result of an LLM-powered analysis, ready for the user to confirm and write. */
+export interface PendingInit {
+  fileMap: Map<string, string>; // filename → LLM-generated content
+  namespace: string; // derived project slug
+  srcModules: ModuleInfo[]; // for static fallback component files
+  projectInfo: ProjectInfo; // for static fallback core files
+}
+
+export interface ProjectInfo {
   name: string;
   description: string;
   readmeIntro: string;
@@ -242,10 +250,12 @@ async function gatherProjectContext(projectRoot: string, info: ProjectInfo): Pro
 async function collectResponse(
   provider: ProviderAdapter,
   messages: ChatMessage[],
+  onChunk?: (accumulated: string) => void,
 ): Promise<string> {
   let full = '';
   for await (const chunk of provider.complete(messages)) {
     full += chunk;
+    onChunk?.(full);
   }
   return full.trim();
 }
@@ -367,9 +377,93 @@ export async function initializeMemoryBankWithLLM(
   return { filesCreated };
 }
 
+/**
+ * Run the LLM to analyze the project and propose memory bank file content.
+ * Does NOT write anything to disk — call writeProposedFiles() after user confirms.
+ * Falls back to an empty fileMap (static builders will fill gaps) if LLM fails.
+ *
+ * @param onChunk  Optional callback receiving accumulated response text, for streaming UI.
+ */
+export async function analyzeAndProposeInit(
+  projectRoot: string,
+  provider: ProviderAdapter,
+  onChunk?: (accumulated: string) => void,
+): Promise<PendingInit> {
+  const namespace = await deriveProjectSlug(projectRoot);
+  const projectInfo = await scanProject(projectRoot);
+  const srcModules = await discoverModules(projectRoot, projectInfo.srcDirs);
+
+  let fileMap: Map<string, string>;
+  try {
+    const context = await gatherProjectContext(projectRoot, projectInfo);
+    const messages: ChatMessage[] = [
+      { role: 'system', content: INIT_SYSTEM_PROMPT },
+      { role: 'user', content: context },
+    ];
+    const output = await collectResponse(provider, messages, onChunk);
+    fileMap = parseInitOutput(output);
+  } catch (err) {
+    process.stderr.write(
+      `[init] LLM call failed, falling back to static templates: ${err instanceof Error ? err.message : String(err)}\n`,
+    );
+    fileMap = new Map(); // empty → writeProposedFiles uses static builders for everything
+  }
+
+  return { fileMap, namespace, srcModules, projectInfo };
+}
+
+/**
+ * Write a PendingInit proposal to disk.
+ * LLM-generated content is preferred; static builders fill any missing files.
+ */
+export async function writeProposedFiles(
+  projectRoot: string,
+  pending: PendingInit,
+): Promise<string[]> {
+  const { fileMap, namespace, srcModules, projectInfo } = pending;
+  const manager = new MemoryManager(projectRoot, namespace);
+  await manager.ensureStructure();
+
+  const filesCreated: string[] = [];
+
+  const index = buildIndex(srcModules);
+  await manager.saveIndex(index);
+  filesCreated.push('index.md');
+
+  const staticFallbacks: Record<string, () => string> = {
+    'project.md': () => buildProjectFile(projectInfo),
+    'tech.md': () => buildTechFile(projectInfo),
+    'patterns.md': () => buildPatternsFile(projectInfo),
+    'progress.md': () => buildProgressFile(),
+  };
+
+  for (const [filename, builder] of Object.entries(staticFallbacks)) {
+    const content = fileMap.get(filename) ?? builder();
+    await manager.updateFile(filename, content);
+    filesCreated.push(filename);
+  }
+
+  for (const mod of srcModules) {
+    const componentPath = `components/${mod.name}.md`;
+    const content = fileMap.get(componentPath) ?? buildComponentFile(mod);
+    await manager.updateFile(componentPath, content);
+    filesCreated.push(componentPath);
+  }
+
+  // Extra component files the LLM proposed beyond what scanProject discovered
+  for (const [filename, content] of fileMap) {
+    if (filename.startsWith('components/') && !filesCreated.includes(filename)) {
+      await manager.updateFile(filename, content);
+      filesCreated.push(filename);
+    }
+  }
+
+  return filesCreated;
+}
+
 // ---------------------------------------------------------------------------
 
-interface ModuleInfo {
+export interface ModuleInfo {
   name: string;
   files: string[];
   description: string;

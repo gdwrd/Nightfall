@@ -76,7 +76,10 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const terminalRows = stdout?.rows ?? 24;
-  const isThinking = phase === 'planning' || phase === 'running';
+  const hasActiveAgents = Object.values(agentStates).some(
+    (a) => a.status !== 'done' && a.status !== 'error',
+  );
+  const isThinking = phase === 'planning' || phase === 'running' || hasActiveAgents;
 
   // ── Animation: single spinner (only while thinking) ────────────────────────
   const [spinnerFrame, setSpinnerFrame] = useState(0);
@@ -139,6 +142,10 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
       // Detect successful /init so the InfoBar updates without restart
       if (payload.command === '/init' && payload.output.startsWith('✓ Memory bank initialized')) {
         setMemoryBankReady(true);
+      }
+
+      if (payload.command === '/init' && payload.output.includes('Type y to create or n to cancel.')) {
+        setAwaitingInitConfirm(true);
       }
 
       if (payload.command === '/clear') {
@@ -456,11 +463,6 @@ export const App: React.FC<AppProps> = ({ config, orchestrator, memoryInitialize
 
       // Route to server — result arrives via 'slash:result' event
       orchestrator.sendSlashCommand(cmd, args);
-
-      // Track init preview awaiting confirmation
-      if (cmd === '/init' && args === '') {
-        setAwaitingInitConfirm(true);
-      }
 
       return;
     }

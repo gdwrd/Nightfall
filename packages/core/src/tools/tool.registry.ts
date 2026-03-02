@@ -39,7 +39,7 @@ const ROLE_TOOLS: Record<AgentRole, string[]> = {
     'run_command',
   ],
   reviewer: ['read_memory', 'read_file', 'list_files', 'search_files', 'run_command'],
-  'memory-manager': ['read_file', 'write_memory', 'update_index'],
+  'memory-manager': ['read_memory', 'read_file', 'write_memory', 'update_index'],
   classifier: [],
   responder: ['read_memory', 'read_file', 'list_files', 'search_files'],
 };
