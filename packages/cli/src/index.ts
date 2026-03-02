@@ -71,9 +71,23 @@ async function main(): Promise<void> {
   server.startLifecycle();
 
   // ── Check memory bank initialization ──────────────────────────────────────
-  const memoryInitialized = fs.existsSync(
-    path.join(projectRoot, '.nightfall', 'memory', 'index.md'),
-  );
+  // Files are written to .nightfall/memory/<namespace>/index.md — check any
+  // subdirectory that contains index.md (namespace-agnostic, no git shell needed).
+  const memoryInitialized = await (async () => {
+    const memDir = path.join(projectRoot, '.nightfall', 'memory');
+    try {
+      const entries = await fs.promises.readdir(memDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          const indexPath = path.join(memDir, entry.name, 'index.md');
+          if (fs.existsSync(indexPath)) return true;
+        }
+      }
+    } catch {
+      /* .nightfall/memory doesn't exist yet */
+    }
+    return false;
+  })();
 
   // ── Enter fullscreen (alternate screen buffer) ─────────────────────────────
   process.stdout.write('\x1b[?1049h\x1b[2J\x1b[H');

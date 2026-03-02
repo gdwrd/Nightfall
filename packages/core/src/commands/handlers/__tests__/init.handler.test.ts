@@ -8,13 +8,29 @@ import type { CommandDispatcherContext } from '../../command.dispatcher.js';
 let tmpDir: string;
 let ctx: CommandDispatcherContext;
 
+// Minimal provider mock — yields a <done> signal so the memory-manager agent
+// terminates immediately without looping, while analyzeAndProposeInit still
+// gets an empty fileMap (no === file === sections present).
+function makeProvider() {
+  return {
+    complete: async function* () {
+      yield '<done>\n{"summary": "Memory bank initialized for testing"}\n</done>';
+    },
+  };
+}
+
+// Minimal orchestrator mock — emit and on are no-ops
+function makeOrchestrator() {
+  return { emit: () => false, on: () => ({}) };
+}
+
 beforeEach(async () => {
   tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'nightfall-init-'));
   ctx = {
     config: {} as CommandDispatcherContext['config'],
     projectRoot: tmpDir,
-    orchestrator: {} as CommandDispatcherContext['orchestrator'],
-    provider: {} as CommandDispatcherContext['provider'],
+    orchestrator: makeOrchestrator() as unknown as CommandDispatcherContext['orchestrator'],
+    provider: makeProvider() as unknown as CommandDispatcherContext['provider'],
   };
 });
 
@@ -24,10 +40,9 @@ afterEach(async () => {
 
 describe('initHandler', () => {
   describe('preview (no args)', () => {
-    it('returns preview text listing files to be created', async () => {
+    it('returns proposal text listing files to be created', async () => {
       const result = await initHandler(ctx, '');
-      expect(result).toContain('Memory bank preview');
-      expect(result).toContain('index.md');
+      expect(result).toContain('Memory bank proposal');
       expect(result).toContain('project.md');
       expect(result).toContain('tech.md');
       expect(result).toContain('patterns.md');
@@ -48,14 +63,14 @@ describe('initHandler', () => {
         .catch(() => false);
       expect(exists).toBe(false);
     });
-
-    it('shows files with descriptions', async () => {
-      const result = await initHandler(ctx, '');
-      expect(result).toContain('memory index');
-    });
   });
 
   describe('confirm mode (args === "confirm")', () => {
+    beforeEach(async () => {
+      // Populate the pending cache by running the preview step first
+      await initHandler(ctx, '');
+    });
+
     it('creates memory bank files and returns success message', async () => {
       const result = await initHandler(ctx, 'confirm');
       expect(result).toContain('Memory bank initialized');
@@ -69,24 +84,32 @@ describe('initHandler', () => {
       expect(stat.isDirectory()).toBe(true);
     });
 
-    it('lists created files in output', async () => {
+    it('includes namespace subdirectory path in output', async () => {
       const result = await initHandler(ctx, 'confirm');
-      expect(result).toContain('index.md');
+      // Output format: "✓ Memory bank initialized in .nightfall/memory/<namespace>/"
+      expect(result).toMatch(/\.nightfall\/memory\/.+\//);
     });
 
     it('shows checkmark on success', async () => {
       const result = await initHandler(ctx, 'confirm');
       expect(result).toContain('✓');
     });
+
+    it('returns "No pending init" if confirm called without prior /init', async () => {
+      // Different project root — nothing cached for it
+      const otherCtx = { ...ctx, projectRoot: path.join(tmpDir, 'other') };
+      const result = await initHandler(otherCtx, 'confirm');
+      expect(result).toContain('No pending init found');
+    });
   });
 
   describe('error handling', () => {
-    it('returns error message when initialization fails', async () => {
-      // Make projectRoot a file instead of a directory to force an error
+    it('returns error message when project root is not a directory', async () => {
+      // analyzeAndProposeInit calls scanProject which does readdir — fails on a file path
       const filePath = path.join(tmpDir, 'not-a-dir');
       await fs.writeFile(filePath, 'content');
       const badCtx = { ...ctx, projectRoot: filePath };
-      const result = await initHandler(badCtx, 'confirm');
+      const result = await initHandler(badCtx, '');
       expect(result).toContain('Error during /init:');
     });
   });
